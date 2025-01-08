@@ -10,7 +10,7 @@
 
 // Tablica przechowująca identyfikatory kolejek dla kasjerów (max 10)
 int queue_ids[MAX_CASHIERS];
-int should_exit = 0;  // Flaga informująca, kiedy kasjer ma zakończyć pracę
+int should_exit;  // Flaga informująca, kiedy kasjer ma zakończyć pracę
 
 void init_cashier(int cashier_id) {
     // Tworzenie kolejki komunikatu kasjera
@@ -48,14 +48,14 @@ void* cashier_function(void* arg) {
     // Po zakończeniu pracy kasjera, usuwamy kolejkę
     cleanup_queue(cashier_id);
 
-    return NULL;
+    pthread_exit(NULL);
 }
 
 // Funkcja do tworzenia wszystkich kasjerów
 void init_cashiers(pthread_t* cashier_threads, int* cashier_ids, int num_cashiers) {
     // Inicjalizacja kasjerów
     for (int i = 0; i < num_cashiers; i++) {
-        cashier_ids[i] = i + 1;  // Numer kasjera (1, 2, 3, ...)
+        cashier_ids[i] = i + 1; 
         init_cashier(cashier_ids[i]);  // Inicjalizacja kasjera z kolejką
 
         // Tworzenie wątku kasjera
@@ -72,5 +72,13 @@ void cleanup_queue(int cashier_id) {
         perror("Błąd usuwania kolejki komunikatów");
     } else {
         printf("Kolejka komunikatów dla kasjera %d została usunięta.\n", cashier_id);
+    }
+}
+
+
+// Funkcja do oczekiwania na zakończenie pracy kasjerów
+void wait_for_cashiers(pthread_t* cashier_threads, int num_cashiers) {
+    for (int i = 0; i < num_cashiers; i++) {
+        pthread_join(cashier_threads[i], NULL);  // Czeka na zakończenie każdego wątku kasjera
     }
 }

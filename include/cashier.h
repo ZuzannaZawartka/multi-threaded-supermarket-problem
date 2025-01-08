@@ -14,6 +14,8 @@ extern int queue_ids[MAX_CASHIERS];  // Tablica dla kolejki komunikatów
 
 void init_cashier(int cashier_id);
 void init_cashiers(pthread_t* cashier_threads, int* cashier_ids, int num_cashiers);
+void cleanup_queue(int cashier_id) ;
 void* cashier_function(void* arg);
+void wait_for_cashiers(pthread_t* cashier_threads, int num_cashiers);
 
 #endif
