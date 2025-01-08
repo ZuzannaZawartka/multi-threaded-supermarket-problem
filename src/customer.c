@@ -7,6 +7,7 @@
 #include <time.h>
 #include "customer.h"
 #include "cashier.h"
+#include "process_manager.h"
 #include <sys/wait.h>
 
 extern int queue_ids[];  // Tablica ID kolejki komunikatów
@@ -18,10 +19,12 @@ void* customer_function(void* arg) {
     CustomerData* data = (CustomerData*)arg;  // Odczytanie danych z przekazanej struktury
     pid_t pid = getpid();
     int cashier_id = data->cashier_id;  // Kasjer, do którego klient wysyła komunikat
+    
     Message message;
 
+    // Ustawiamy mtype na PID klienta (klient odbiera tylko dla siebie)
     message.mtype = cashier_id;
-    message.customer_pid = pid; 
+    message.customer_pid = pid;
 
     //Wysłanie komunikatu do odpowiedniej kolejki kasjera
     if (msgsnd(queue_ids[cashier_id - 1], &message, sizeof(message) - sizeof(long), 0) == -1) {
@@ -32,7 +35,13 @@ void* customer_function(void* arg) {
     printf("Klient %d wysłał komunikat do kasy %d. Czeka na obsługe \n", pid, cashier_id);
 
 
-    pause();  // Czekanie na zakończenie obsługi przez kasjera
+    // Oczekiwanie na komunikat od kasjera, który ma PID klienta
+    if (msgrcv(queue_ids[cashier_id - 1], &message, sizeof(message) - sizeof(long), pid, 0) == -1) {
+        perror("Błąd odbierania komunikatu od kasjera");
+        exit(1);
+    }
+
+    //  pause();  // Czekanie na zakończenie obsługi przez kasjera
 
     printf("Klient %d opuszcza sklep\n", pid);
     free(data);  // Zwolnienie pamięci po zakończeniu działania wątku
@@ -57,22 +66,34 @@ void create_customer_processes(int num_customers, int num_cashiers) {
             exit(1);
         }
 
-        // Zapisz PID klienta
-        customer_pids[i] = pid;
-    }
-}
-void wait_for_customers(int num_customers) {
-    for (int i = 0; i < num_customers; i++) {
-        wait(NULL);  // Czeka na zakończenie każdego procesu klienta
+        // Zapisz PID klienta w process managerze
+        add_process(pid);
     }
 }
 
-// Funkcja do usuwania wszystkich klientów
-void terminate_all_customers() {
-    for (int i = 0; i < MAX_CUSTOMERS; i++) {
-        if (customer_pids[i] > 0) {
-            kill(customer_pids[i], SIGTERM);  // Wysyłanie sygnału zakończenia do klienta
-            printf("Klient o PID %d został zakończony.\n", customer_pids[i]);
+void wait_for_customers(int num_customers) {
+    int status;
+    for (int i = 0; i < num_customers; i++) {
+        pid_t finished_pid = waitpid(-1, &status, 0);  // Czekamy na zakończenie dowolnego procesu klienta
+        
+        if (finished_pid > 0) {
+            printf("Proces klienta %d zakończony.\n", finished_pid);
+            // Usuwamy PID klienta z listy
+            remove_process(finished_pid);
         }
     }
+}
+
+
+// Funkcja do usuwania wszystkich klientów
+void terminate_all_customers() {
+    ProcessNode* current = process_list;
+    while (current != NULL) {
+        kill(current->pid, SIGTERM);  // Wysyłanie sygnału zakończenia do klienta
+        printf("Klient o PID %d został zakończony.\n", current->pid);
+        ProcessNode* temp = current;
+        current = current->next;
+        free(temp);  // Usuwamy element z listy
+    }
+    process_list = NULL;  // Ustawiamy wskaźnik na NULL
 }
