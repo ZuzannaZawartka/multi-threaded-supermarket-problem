@@ -1,16 +1,19 @@
-#include <sys/types.h> 
-#define MAX_CASH_REGISTER 10
+#ifndef CASHIER_H
+#define CASHIER_H
+
+#include <pthread.h>
 
 typedef struct {
-    int register_id;       // Numer kasy
-    int clients_in_queue;  // Liczba klientów w kolejce
-    int is_open;           // 1 - Kasa otwarta, 0 - Kasa zamknięta
-    pid_t pid;  
-} Cashier;
+    long mtype;  // Typ komunikatu (ID kasjera)
+    pid_t customer_pid;  // PID klienta
+} Message;
 
 
-void initialize_cashier(Cashier* cashier, int register_id);
-void open_cashier(Cashier* cashier);
-void close_cashier(Cashier* cashier);
-void serve_clients(Cashier* cashier);
-void update_queue(Cashier* cashier, int num_clients);
+#define MAX_CASHIERS 10
+extern int queue_ids[MAX_CASHIERS];  // Tablica dla kolejki komunikatów
+
+void init_cashier(int cashier_id);
+void init_cashiers(pthread_t* cashier_threads, int* cashier_ids, int num_cashiers);
+void* cashier_function(void* arg);
+
+#endif
