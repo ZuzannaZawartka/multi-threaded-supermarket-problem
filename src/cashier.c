@@ -11,7 +11,7 @@
 // Tablica przechowująca identyfikatory kolejek dla kasjerów (max 10)
 extern SharedMemory* shared_mem; // Deklaracja pamięci dzielonej
 
-void init_cashier(int cashier_id) {
+void create_cashier(pthread_t* cashier_thread, int* cashier_id) {
     // Tworzenie kolejki komunikatu dla kasjera
     int queue_id = msgget(IPC_PRIVATE, 0666 | IPC_CREAT);
     if (queue_id == -1) {
@@ -20,7 +20,15 @@ void init_cashier(int cashier_id) {
     }
 
     // Zapisanie identyfikatora kolejki w pamięci dzielonej
-    set_queue_id(shared_mem, cashier_id - 1, queue_id);
+    set_queue_id(shared_mem, *cashier_id - 1, queue_id);
+
+    // Tworzenie wątku kasjera
+    if (pthread_create(cashier_thread, NULL, cashier_function, cashier_id) != 0) {
+        perror("Błąd tworzenia wątku kasjera");
+        exit(1);
+    }
+
+    printf("Kasjer %d został uruchomiony.\n", *cashier_id);
 }
 
 void* cashier_function(void* arg) {
@@ -31,10 +39,18 @@ void* cashier_function(void* arg) {
     int queue_id = get_queue_id(shared_mem, cashier_id - 1);
 
     while (1) {
-        // Sprawdzanie flagi should_exit z pamięci dzielonej
+        
+
+        //sprawdzamy czy kasjer ma skonczyc prace
         if (get_should_exit(shared_mem)) {
-            break;  // Zakończenie pracy kasjera
+            // Jeśli liczba klientów wynosi 0, kasjer czeka
+            if (get_number_customer(shared_mem) == 0) {
+                break;  // Kasjer czeka, aż liczba klientów będzie 0
+            }
+            sleep(1);
+            continue;  // Zakończenie pracy kasjera, jesli klienci juz wyszli
         }
+
 
         // Próba odebrania wiadomości z kolejki
         if (msgrcv(queue_id, &message, sizeof(message) - sizeof(long), cashier_id, IPC_NOWAIT) == -1) {
@@ -65,20 +81,20 @@ void* cashier_function(void* arg) {
     pthread_exit(NULL);
 }
 
-// Funkcja do tworzenia wszystkich kasjerów
-void init_cashiers(pthread_t* cashier_threads, int* cashier_ids, int num_cashiers) {
-    // Inicjalizacja kasjerów
-    for (int i = 0; i < num_cashiers; i++) {
-        cashier_ids[i] = i + 1; 
-        init_cashier(cashier_ids[i]);  // Inicjalizacja kasjera z kolejką
+// // Funkcja do tworzenia wszystkich kasjerów
+// void init_cashiers(pthread_t* cashier_threads, int* cashier_ids, int num_cashiers) {
+//     // Inicjalizacja kasjerów
+//     for (int i = 0; i < num_cashiers; i++) {
+//         cashier_ids[i] = i + 1; 
+//         init_cashier(cashier_ids[i]);  // Inicjalizacja kasjera z kolejką
 
-        // Tworzenie wątku kasjera
-        if (pthread_create(&cashier_threads[i], NULL, cashier_function, &cashier_ids[i]) != 0) {
-            perror("Błąd tworzenia wątku kasjera");
-            exit(1);
-        }
-    }
-}
+//         // Tworzenie wątku kasjera
+//         if (pthread_create(&cashier_threads[i], NULL, cashier_function, &cashier_ids[i]) != 0) {
+//             perror("Błąd tworzenia wątku kasjera");
+//             exit(1);
+//         }
+//     }
+// }
 
 // Czyszczenie kolejki kasjera
 void cleanup_queue(int cashier_id) {
@@ -88,7 +104,7 @@ void cleanup_queue(int cashier_id) {
     if (msgctl(queue_id, IPC_RMID, NULL) == -1) {
         perror("Błąd usuwania kolejki komunikatów");
     } else {
-        printf("Kolejka komunikatów dla kasjera %d została usunięta.\n", cashier_id);
+        printf("Kolejka komunikatów dla kasjera %d została usunięta.\n", cashier_id-1);
     }
 }
 
