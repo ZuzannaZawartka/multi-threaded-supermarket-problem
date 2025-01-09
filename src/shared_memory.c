@@ -22,6 +22,7 @@ SharedMemory* init_shared_memory() {
     }
 
     shared_mem->should_exit = 0;
+    shared_mem->number_customer = 0;
     if (sem_init(&shared_mem->semaphore, 1, 1) != 0) {  // Semafor współdzielony między procesami
         perror("Błąd inicjalizacji semafora");
         exit(1);
@@ -81,4 +82,18 @@ int get_queue_id(SharedMemory* shared_mem, int cashier_id) {
     int queue_id = shared_mem->queue_ids[cashier_id];
     sem_post(&shared_mem->semaphore);
     return queue_id;
+}
+
+
+void increment_number_customer(SharedMemory* shared_mem) {
+    sem_wait(&shared_mem->semaphore);  // Czekamy na dostęp do sekcji krytycznej
+    shared_mem->number_customer++;     // Zwiększamy liczbę klientów
+    sem_post(&shared_mem->semaphore);  // Zwalniamy sekcję krytyczną
+}
+
+
+void decrement_number_customer(SharedMemory* shared_mem) {
+    sem_wait(&shared_mem->semaphore);  // Czekamy na dostęp do sekcji krytycznej
+    shared_mem->number_customer--;     // Zmniejszamy liczbę klientów
+    sem_post(&shared_mem->semaphore);  // Zwalniamy sekcję krytyczną
 }
