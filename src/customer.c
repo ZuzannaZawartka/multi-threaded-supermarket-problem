@@ -9,8 +9,10 @@
 #include "cashier.h"
 #include "process_manager.h"
 #include <sys/wait.h>
+#include <errno.h>
+#include "shared_memory.h"
 
-extern int queue_ids[];  // Tablica ID kolejki komunikatów
+extern SharedMemory* shared_mem;  // Dostęp do pamięci dzielonej
 
 // Tablica pidow klientow
 pid_t customer_pids[MAX_CUSTOMERS];
@@ -19,31 +21,69 @@ void* customer_function(void* arg) {
     CustomerData* data = (CustomerData*)arg;  // Odczytanie danych z przekazanej struktury
     pid_t pid = getpid();
     int cashier_id = data->cashier_id;  // Kasjer, do którego klient wysyła komunikat
-    
-    Message message;
+    int stay_time = generate_random_time(0, 3);
 
-    // Ustawiamy mtype na PID klienta (klient odbiera tylko dla siebie)
+    printf("Klient %d przybył do sklepu i będzie czekał przez %d sekund.\n", pid, stay_time);
+
+    // Cykliczne sprawdzanie flagi, czy pożar jest aktywny
+    time_t start_time = time(NULL);  // Czas rozpoczęcia chodzenia klienta po sklepie
+    while (difftime(time(NULL), start_time) < stay_time) {
+        
+        // Sprawdzamy flagę should_exit w pamięci dzielonej
+        if (get_should_exit(shared_mem)) {
+            free(data);  // Zwolnienie pamięci po zakończeniu działania wątku
+            return NULL;
+        }
+
+        // Jeśli flaga nie jest ustawiona, klient dalej chodzi po sklepie
+        sleep(1);  // Przerwa, aby dać innym procesom czas na działanie
+    }
+
+
+    Message message;
     message.mtype = cashier_id;
     message.customer_pid = pid;
 
+    //sprawdzamy przed wyslaniem komunikatu czy nie ma pozaru
+    if (get_should_exit(shared_mem)) {
+        free(data);  
+        return NULL;
+    }
+
+    int queue_id = get_queue_id(shared_mem, cashier_id - 1);//korzystanie z pamieci dzieloenj zeby dostac kolejke
+
     //Wysłanie komunikatu do odpowiedniej kolejki kasjera
-    if (msgsnd(queue_ids[cashier_id - 1], &message, sizeof(message) - sizeof(long), 0) == -1) {
+    if (msgsnd(queue_id, &message, sizeof(message) - sizeof(long), 0) == -1) {
         perror("Błąd wysyłania komunikatu");
         exit(1);
     }
 
+
     printf("Klient %d wysłał komunikat do kasy %d. Czeka na obsługe \n", pid, cashier_id);
 
 
-    // Oczekiwanie na komunikat od kasjera, który ma PID klienta
-    if (msgrcv(queue_ids[cashier_id - 1], &message, sizeof(message) - sizeof(long), pid, 0) == -1) {
-        perror("Błąd odbierania komunikatu od kasjera");
-        exit(1);
+    while (1) {
+        // Cykliczne sprawdzanie flagi should_exit w międzyczasie
+        if (get_should_exit(shared_mem)) {
+            free(data); 
+            return NULL;
+        }
+
+       if (msgrcv(queue_id, &message, sizeof(message) - sizeof(long), pid, IPC_NOWAIT) == -1) {
+            if (errno == ENOMSG) {
+                sleep(1);
+                continue;
+            } else {
+                perror("Błąd odbierania komunikatu");
+                exit(1);
+            }
+        }
+
+        // Jeśli otrzymaliśmy odpowiedź, klient kończy czekanie
+        printf("Klient %d otrzymał odpowiedź od kasjera i opuszcza sklep.\n", pid);
+        break;
     }
 
-    //  pause();  // Czekanie na zakończenie obsługi przez kasjera
-
-    printf("Klient %d opuszcza sklep\n", pid);
     free(data);  // Zwolnienie pamięci po zakończeniu działania wątku
     return NULL;
 }
@@ -57,6 +97,7 @@ void create_customer_processes(int num_customers, int num_cashiers) {
         pid_t pid = fork();
     
         if (pid == 0) { 
+            signal(SIGINT, SIG_IGN);//IGNOROWANIE SIGINTA W PROCESACH Potomnych bo inaczej na signak handler dla kazdego mamy rekacje
             CustomerData* data = malloc(sizeof(CustomerData));
             data->cashier_id = customer_cashier_id;  // Przypisanie kasjera dla klienta
             customer_function(data);  // Klient działa, przypisany do danego kasjera
@@ -86,14 +127,19 @@ void wait_for_customers(int num_customers) {
 
 
 // Funkcja do usuwania wszystkich klientów
-void terminate_all_customers() {
-    ProcessNode* current = process_list;
-    while (current != NULL) {
-        kill(current->pid, SIGTERM);  // Wysyłanie sygnału zakończenia do klienta
-        printf("Klient o PID %d został zakończony.\n", current->pid);
-        ProcessNode* temp = current;
-        current = current->next;
-        free(temp);  // Usuwamy element z listy
-    }
-    process_list = NULL;  // Ustawiamy wskaźnik na NULL
+// void terminate_all_customers() {
+//     ProcessNode* current = process_list;
+//     while (current != NULL) {
+//         kill(current->pid, SIGTERM);  // Wysyłanie sygnału zakończenia do klienta
+//         printf("Klient o PID %d został zakończony.\n", current->pid);
+//         ProcessNode* temp = current;
+//         current = current->next;
+//         free(temp);  // Usuwamy element z listy
+//     }
+//     process_list = NULL;  // Ustawiamy wskaźnik na NULL
+// }
+
+// Funkcja do generowania losowego czasu (w sekundach)
+int generate_random_time(int min_time, int max_time) {
+    return rand() % (max_time - min_time + 1) + min_time;
 }
