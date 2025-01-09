@@ -21,8 +21,9 @@ void* customer_function(void* arg) {
     CustomerData* data = (CustomerData*)arg;  // Odczytanie danych z przekazanej struktury
     pid_t pid = getpid();
     int cashier_id = data->cashier_id;  // Kasjer, do którego klient wysyła komunikat
-    int stay_time = generate_random_time(0, 3);
+    int stay_time = generate_random_time(2,5);
 
+    increment_number_customer(shared_mem);
     printf("Klient %d przybył do sklepu i będzie czekał przez %d sekund.\n", pid, stay_time);
 
     // Cykliczne sprawdzanie flagi, czy pożar jest aktywny
@@ -31,6 +32,8 @@ void* customer_function(void* arg) {
         
         // Sprawdzamy flagę should_exit w pamięci dzielonej
         if (get_should_exit(shared_mem)) {
+
+            decrement_number_customer(shared_mem);  
             free(data);  // Zwolnienie pamięci po zakończeniu działania wątku
             return NULL;
         }
@@ -46,6 +49,8 @@ void* customer_function(void* arg) {
 
     //sprawdzamy przed wyslaniem komunikatu czy nie ma pozaru
     if (get_should_exit(shared_mem)) {
+
+        decrement_number_customer(shared_mem);  
         free(data);  
         return NULL;
     }
@@ -65,8 +70,7 @@ void* customer_function(void* arg) {
     while (1) {
         // Cykliczne sprawdzanie flagi should_exit w międzyczasie
         if (get_should_exit(shared_mem)) {
-            free(data); 
-            return NULL;
+            break;
         }
 
        if (msgrcv(queue_id, &message, sizeof(message) - sizeof(long), pid, IPC_NOWAIT) == -1) {
@@ -84,6 +88,8 @@ void* customer_function(void* arg) {
         break;
     }
 
+
+    decrement_number_customer(shared_mem);  
     free(data);  // Zwolnienie pamięci po zakończeniu działania wątku
     return NULL;
 }
@@ -125,19 +131,6 @@ void wait_for_customers(int num_customers) {
     }
 }
 
-
-// Funkcja do usuwania wszystkich klientów
-// void terminate_all_customers() {
-//     ProcessNode* current = process_list;
-//     while (current != NULL) {
-//         kill(current->pid, SIGTERM);  // Wysyłanie sygnału zakończenia do klienta
-//         printf("Klient o PID %d został zakończony.\n", current->pid);
-//         ProcessNode* temp = current;
-//         current = current->next;
-//         free(temp);  // Usuwamy element z listy
-//     }
-//     process_list = NULL;  // Ustawiamy wskaźnik na NULL
-// }
 
 // Funkcja do generowania losowego czasu (w sekundach)
 int generate_random_time(int min_time, int max_time) {
