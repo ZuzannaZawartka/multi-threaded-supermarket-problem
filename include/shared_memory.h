@@ -20,6 +20,7 @@ void set_queue_id(SharedMemory* shared_mem, int cashier_id, int queue_id);
 int get_queue_id(SharedMemory* shared_mem, int cashier_id) ;
 void increment_number_customer(SharedMemory* shared_mem);
 void decrement_number_customer(SharedMemory* shared_mem);
+int get_number_customer(SharedMemory* shared_mem) ;
 
 
 

@@ -97,3 +97,12 @@ void decrement_number_customer(SharedMemory* shared_mem) {
     shared_mem->number_customer--;     // Zmniejszamy liczbę klientów
     sem_post(&shared_mem->semaphore);  // Zwalniamy sekcję krytyczną
 }
+
+
+// Funkcja do pobierania liczby klientów w sklepie
+int get_number_customer(SharedMemory* shared_mem) {
+    sem_wait(&shared_mem->semaphore);  // Czekamy na dostęp do sekcji krytycznej
+    int current_customers = shared_mem->number_customer;  // Zapisujemy aktualną liczbę klientów
+    sem_post(&shared_mem->semaphore);  // Zwalniamy sekcję krytyczną
+    return current_customers;  
+}
