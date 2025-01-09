@@ -14,7 +14,7 @@
 
 #define DEFAULT_CASHIERS 2
 
-#define NUM_CUSTOMERS 15 // Liczba klientów (tymczasowo)
+int NUM_CUSTOMERS  = 5 ;// Liczba klientów (tymczasowo)
 
 SharedMemory* shared_mem;
 
@@ -25,7 +25,7 @@ void sigint_handler(int signum) {
     // Zaktualizowanie flagi zakończenia
     set_should_exit(shared_mem, 1);
 
-    terminate_all_customers();
+    // terminate_all_customers();
 
     printf("Wszystkie procesy i wątki zostaną zakończone.\n");
 }
@@ -33,6 +33,8 @@ void sigint_handler(int signum) {
 
 
 int main() {
+    srand(time(NULL));  
+
     pthread_t cashier_threads[MAX_CASHIERS];
     int cashier_ids[MAX_CASHIERS];
 
@@ -58,3 +60,11 @@ int main() {
 
     return 0;
 }
+
+//TO DO ZEBY DO TEJ PAMIECI WSPOLDZIELONEJ DODAC TE KOLEJKI KOMUNIKATOW BO Z TEGO KORZYSTA I KLIENT I KASJER 
+
+//synchronizacja listy kasjerow oraz tego sygnalu pozaru (semaforami?)
+
+//dodac tego menadzera kasjerow ktory monitoruje liczbe ludzi w sklepie i na podstawie tego dodaje kasjerow
+
+//dodac strazaka
