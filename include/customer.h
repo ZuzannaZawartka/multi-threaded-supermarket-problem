@@ -15,6 +15,7 @@ void* customer_function(void* arg);
 //funkcja tworząca proces klienta
 void create_customer_processes(int num_customers, int num_cashiers);
 
+
 //czekanie aż każdy proces zakończy się
 void wait_for_customers(int num_customers);
 

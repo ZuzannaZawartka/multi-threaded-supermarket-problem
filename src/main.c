@@ -10,6 +10,9 @@
 #include "shared_memory.h"
 #include "manager_cashiers.h"
 
+#include <sys/sem.h>  // Do operacji na semaforach systemowych
+#include <sys/ipc.h> 
+#include <fcntl.h>  // Dla O_CREAT
 
 #define MAX_CASHIERS 10 // Maksymalna liczba kasjerów
 
@@ -17,7 +20,10 @@
 
 int NUM_CUSTOMERS  = 30 ;// Liczba klientów (tymczasowo)
 
+
 SharedMemory* shared_mem;
+sem_t* shared_mem_semaphore; // Semafor dla synchronizacji dostępu do pamięci dzielonej
+
 
 // Handler dla sygnału SIGINT (Ctrl+C)
 void sigint_handler(int signum) {
@@ -31,15 +37,35 @@ void sigint_handler(int signum) {
     printf("Wszystkie procesy i wątki zostaną zakończone.\n");
 }
 
+// Funkcja inicjalizująca semafor
+void init_semaphore() {
+    // Tworzymy semafor, jeśli jeszcze nie istnieje
+    shared_mem_semaphore = sem_open("/shared_mem_semaphore", O_CREAT, 0666, 1);
+    if (shared_mem_semaphore == SEM_FAILED) {
+        perror("Błąd tworzenia semafora");
+        exit(1);
+    }
+}
+
+// Funkcja czyszcząca semafor
+void cleanup_semaphore() {
+    if (sem_close(shared_mem_semaphore) == -1) {
+        perror("Błąd zamykania semafora");
+    }
+    if (sem_unlink("/shared_mem_semaphore") == -1) {
+        perror("Błąd usuwania semafora");
+    }
+}
+
 
 int main() {
     srand(time(NULL));  
-
     pthread_t monitor_thread; 
-    // pthread_t cashier_threads[MAX_CASHIERS];
-    // int cashier_ids[MAX_CASHIERS];
-     
-    shared_mem = init_shared_memory();  // Przypisz wskaźnik do pamięci dzielonej
+
+    // Inicjalizacja semafora
+    init_semaphore();
+    
+    shared_mem = init_shared_memory(shared_mem_semaphore);  // Przypisz wskaźnik do pamięci dzielonej
 
     // Rejestracja handlera sygnału SIGINT
     signal(SIGINT, sigint_handler);
@@ -47,19 +73,19 @@ int main() {
     // Tworzenie wątku dla managera kasjerow
     init_manager(&monitor_thread);
 
-    // Tworzenie kasjerów
-    // init_cashiers(cashier_threads, cashier_ids, DEFAULT_CASHIERS);
 
     // Tworzenie procesów klientów
-    create_customer_processes(NUM_CUSTOMERS, DEFAULT_CASHIERS);
+    create_customer_processes(NUM_CUSTOMERS,DEFAULT_CASHIERS);
+
 
     // Czekanie na zakończenie procesów klientów
     wait_for_customers(NUM_CUSTOMERS);
 
-    // Czekanie na zakończenie kasjerów
-    // wait_for_cashiers(cashier_threads, DEFAULT_CASHIERS);
 
     terminate_manager(monitor_thread);
+
+    // Czyszczenie semafora
+    cleanup_semaphore();
 
     //Czyszczenie pamięci dzielonej
     cleanup_shared_memory(shared_mem);

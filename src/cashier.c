@@ -40,7 +40,6 @@ void* cashier_function(void* arg) {
 
     while (1) {
         
-
         //sprawdzamy czy kasjer ma skonczyc prace
         if (get_should_exit(shared_mem)) {
             // Jeśli liczba klientów wynosi 0, kasjer czeka
@@ -50,7 +49,6 @@ void* cashier_function(void* arg) {
             sleep(1);
             continue;  // Zakończenie pracy kasjera, jesli klienci juz wyszli
         }
-
 
         // Próba odebrania wiadomości z kolejki
         if (msgrcv(queue_id, &message, sizeof(message) - sizeof(long), cashier_id, IPC_NOWAIT) == -1) {
@@ -66,6 +64,17 @@ void* cashier_function(void* arg) {
 
         sleep(1);
 
+
+         //sprawdzamy czy kasjer ma skonczyc prace
+        if (get_should_exit(shared_mem)) {
+            // Jeśli liczba klientów wynosi 0, kasjer czeka
+            if (get_number_customer(shared_mem) == 0) {
+                break;  // Kasjer czeka, aż liczba klientów będzie 0
+            }
+            sleep(1);
+            continue;  // Zakończenie pracy kasjera, jesli klienci juz wyszli
+        }
+        
         // Wysłanie odpowiedzi do klienta
         message.mtype = message.customer_pid;
         if (msgsnd(queue_id, &message, sizeof(message) - sizeof(long), 0) == -1) {
@@ -104,7 +113,7 @@ void cleanup_queue(int cashier_id) {
     if (msgctl(queue_id, IPC_RMID, NULL) == -1) {
         perror("Błąd usuwania kolejki komunikatów");
     } else {
-        printf("Kolejka komunikatów dla kasjera %d została usunięta.\n", cashier_id-1);
+        // printf("Kolejka komunikatów dla kasjera %d została usunięta.\n", cashier_id-1);
     }
 }
 

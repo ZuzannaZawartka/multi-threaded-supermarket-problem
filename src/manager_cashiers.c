@@ -16,7 +16,7 @@ void* manage_customers(void* arg) {
 
     pthread_t cashier_threads[MAX_CASHIERS];  // Tablica do przechowywania wątków kasjerów
     int cashier_ids[MAX_CASHIERS];
-    int current_cashiers = 0; 
+    int current_cashiers = get_active_cashiers(shared_mem); 
 
     create_initial_cashiers(cashier_threads,cashier_ids,&current_cashiers);
 
@@ -28,13 +28,16 @@ void* manage_customers(void* arg) {
         printf("Aktualna liczba klientów w sklepie: %d\n", current_customers);
 
 
-        // Tworzenie kasjerów na podstawie liczby klientów
-        if (current_customers >= MIN_PEOPLE_FOR_CASHIER * (current_cashiers + 1) && current_cashiers < MAX_CASHIERS) {
-            // Tworzymy nowego kasjera
-            cashier_ids[current_cashiers] = current_cashiers + 1;  // Identyfikator kasjera (od jedynki)
-            create_cashier(&cashier_threads[current_cashiers], &cashier_ids[current_cashiers]);
-            current_cashiers++;  // Zwiększamy liczbę kasjerów
-        }
+        // // Tworzenie kasjerów na podstawie liczby klientów
+        // if (current_customers >= MIN_PEOPLE_FOR_CASHIER * (current_cashiers + 1) && current_cashiers < MAX_CASHIERS) {
+        //     // Tworzymy nowego kasjera
+        //     cashier_ids[current_cashiers] = current_cashiers + 1;  // Identyfikator kasjera (od jedynki)
+        //     create_cashier(&cashier_threads[current_cashiers], &cashier_ids[current_cashiers]);
+        //     current_cashiers++;  // Zwiększamy liczbę kasjerów
+
+        //     // Aktualizujemy liczbę kasjerów w pamięci dzielonej
+        //     set_active_cashiers(shared_mem, current_cashiers);
+        // }
 
         sleep(1);  // Czekaj przez 1 sekundę, zanim wyświetlisz liczbę ponownie
     }
@@ -53,6 +56,9 @@ void create_initial_cashiers(pthread_t* cashier_threads, int* cashier_ids, int* 
         (*current_cashiers)++;  // Zwiększamy liczbę kasjerów
     }
     printf("Utworzono minimalną liczbę kasjerów: %d\n", MIN_CASHIERS);
+
+     // Ustawiamy liczbę kasjerów w pamięci dzielonej
+    set_active_cashiers(shared_mem, *current_cashiers);
 }
 
 // Funkcja do inicjalizacji menedżera
