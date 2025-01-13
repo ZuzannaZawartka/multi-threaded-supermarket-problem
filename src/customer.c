@@ -31,7 +31,7 @@ void* customer_function(void* arg) {
     CustomerData* data = (CustomerData*)arg;  // Odczytanie danych z przekazanej struktury
     pid_t pid = getpid();
     int cashier_id = data->cashier_id;  // Kasjer, do którego klient wysyła komunikat
-    int stay_time = generate_random_time(2,3);
+    int stay_time = generate_random_time(1,2);
 
     printf("Klient %d przybył do sklepu i będzie czekał przez %d sekund.\n", pid, stay_time);
 
@@ -88,7 +88,6 @@ void handle_customer_signal(int sig) {
 
 //wylaczenie tworzenia nowych customerow
 void handle_customer_signal2(int sig) {
-
     cleanup_processes();  // Oczyszczenie pamięci związanej z procesami
     destroy_semaphore_customer();  // Zwalniamy semafor
     pthread_exit(NULL); 
@@ -147,7 +146,7 @@ void* create_customer_processes(void* arg) {
 
         get_customers_in_shop(semaphore);
         // Losowy czas na następnego klienta
-        sleep(generate_random_time(5, 7));  // Klient może przyjść w losowych odstępach czasu
+        sleep(generate_random_time(1, 3));  // Klient może przyjść w losowych odstępach czasu
     }
 
     // Zamykamy semafor po zakończeniu tworzenia procesów

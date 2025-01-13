@@ -14,39 +14,38 @@
 
 extern SharedMemory* shared_mem;  // Deklaracja pamięci dzielonej
 
-
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
 pthread_t cashier_threads[MAX_CASHIERS];
 int cashier_ids[MAX_CASHIERS];
-
 int current_cashiers = 0;  // Liczba aktywnych kasjerów
 
 
 
 void send_signal_to_cashiers(int signal) {
     int sum_cash = get_current_cashiers();
-    pthread_mutex_lock(&mutex);
+
     for (int i = 0; i < sum_cash; i++) {
-        if (pthread_kill(cashier_threads[i], signal) != 0) {
-            perror("Błąd wysyłania sygnału do kasjera");
+        pthread_t cashier_thread = get_cashier_thread(cashier_threads, i);  // funkcja pomocznicza uzywajaca mutexa
+        
+        //wysylamy sygnal do kasjera
+        if (pthread_kill(cashier_thread, signal) != 0) {
+            perror("Error sending signal to cashier thread");
         }
     }
-    pthread_mutex_unlock(&mutex);
-    
 }
 
 // Przykład: Wywołanie send_signal_to_cashiers() w odpowiedzi na SIGINT
-void sigint_handler2(int signum) {
+void sigTermHandler(int signum) {
     send_signal_to_cashiers(SIGHUP);  
 }
 
 
 void* manage_customers(void* arg) {
     
-    signal(SIGTERM, sigint_handler2); 
+    signal(SIGTERM, sigTermHandler); 
 
-    create_initial_cashiers(cashier_threads,cashier_ids,&current_cashiers);
+    create_initial_cashiers(cashier_threads,cashier_ids);
 
     wait_for_cashiers(cashier_threads, current_cashiers); 
 
@@ -55,17 +54,37 @@ void* manage_customers(void* arg) {
     return NULL;
 }
 
-void create_initial_cashiers(pthread_t* cashier_threads, int* cashier_ids, int* current_cashiers) {
+// void create_initial_cashiers(pthread_t* cashier_threads, int* cashier_ids) {
+//     for (int i = 0; i < MIN_CASHIERS; i++) {
+//         cashier_ids[i] = i + 1;  // Identyfikator kasjera (liczony od 1)
+//         create_cashier(&cashier_threads[i], &cashier_ids[i]);
+//         increment_cashiers();  // Zwiększamy liczbę kasjerów
+//     }
+//     printf("Utworzono minimalną liczbę kasjerów: %d\n", MIN_CASHIERS);
+
+// }
+
+void create_initial_cashiers(pthread_t* cashier_threads, int* cashier_ids) {
     for (int i = 0; i < MIN_CASHIERS; i++) {
-        cashier_ids[i] = i + 1;  // Identyfikator kasjera (liczony od 1)
-        create_cashier(&cashier_threads[i], &cashier_ids[i]);
+
+        set_cashier_id(cashier_ids, i, i + 1);  // Przypisanie ID kasjera
+
+        
+        int* cashier_id = get_cashier_id_pointer(cashier_ids, i);  // Pobranie ID kasjera
+
+
+        pthread_t cashier_thread;
+        create_cashier(&cashier_thread, cashier_id);  // Tworzymy wątek kasjera
+
+        // Ustawiamy wątek kasjera w tablicy (z mutexem)
+        set_cashier_thread(cashier_threads, i, cashier_thread);
+
         increment_cashiers();  // Zwiększamy liczbę kasjerów
     }
     printf("Utworzono minimalną liczbę kasjerów: %d\n", MIN_CASHIERS);
-
 }
 
-
+//TODO OGARNAC MUTEXY NA WATKACH ZEBY WSZYSTKO BYLO POD MUTEXAMI
 
 // Funkcja do inicjalizacji menedżera
 void init_manager(pthread_t* manager_thread) {
@@ -157,4 +176,56 @@ pthread_t get_cashier_thread(pthread_t* cashier_threads, int index) {
     }
 
     return thread;
+}
+
+// Funkcja przypisująca wątek kasjera do tablicy cashier_threads
+void set_cashier_thread(pthread_t* cashier_threads, int index, pthread_t thread) {
+    pthread_mutex_lock(&mutex);  // 
+    cashier_threads[index] = thread;  // Ustawienie wątku kasjera w tablicy
+    pthread_mutex_unlock(&mutex);  
+}
+
+
+int get_cashier_id(int* cashier_ids, int index) {
+    int cashier_id;
+    
+    // Blokujemy mutex, aby zabezpieczyć dostęp do tablicy cashier_ids
+    int ret = pthread_mutex_lock(&mutex);  
+    if (ret != 0) {
+        perror("Error while locking mutex in get_cashier_id");
+        exit(1);  // Możesz też zrobić coś innego, np. zwrócić -1 w przypadku błędu
+    }
+
+    cashier_id = cashier_ids[index];  // Pobieramy ID kasjera z tablicy
+
+    ret = pthread_mutex_unlock(&mutex);  // Zwolnienie mutexu
+    if (ret != 0) {
+        perror("Error while unlocking mutex in get_cashier_id");
+        exit(1);  // Możesz też zrobić coś innego w przypadku błędu
+    }
+
+    return cashier_id;  // Zwracamy ID kasjera
+}
+
+
+void set_cashier_id(int* cashier_ids, int index, int id) {
+    pthread_mutex_lock(&mutex);  // Zabezpieczenie przed równoczesnym dostępem
+    cashier_ids[index] = id;  // Ustawienie ID kasjera w tablicy
+    pthread_mutex_unlock(&mutex);  // Zwolnienie mutexa
+}
+
+
+// Funkcja zwracająca wskaźnik do elementu tablicy cashier_ids
+int* get_cashier_id_pointer(int* cashier_ids, int index) {
+    int* cashier_id = NULL;
+    
+  
+    pthread_mutex_lock(&mutex);  
+    
+    // Zwracamy wskaźnik do odpowiedniego elementu
+    cashier_id = &cashier_ids[index];
+    
+    pthread_mutex_unlock(&mutex);  // Zwolnienie mutexu
+
+    return cashier_id;
 }

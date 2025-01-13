@@ -14,7 +14,6 @@
 // Tablica przechowująca identyfikatory kolejek dla kasjerów (max 10)
 extern SharedMemory* shared_mem; // Deklaracja pamięci dzielonej
 
-
 extern pthread_mutex_t mutex;
 extern pthread_cond_t cond;
 extern int current_cashiers;
@@ -86,20 +85,32 @@ void* cashier_function(void* arg) {
 }
 
 void handle_cashier_signal(int sig) {
-    //DOPISAC CZYSZCZENIE KOLEJEK
+    cleanup_all_queues(); //czyszczenie wszystkich kolejek
     pthread_exit(NULL);  // Kasjer kończy pracę
 }
 
 
-// Czyszczenie kolejki kasjera
 void cleanup_queue(int cashier_id) {
     // Pobranie identyfikatora kolejki kasjera z pamięci dzielonej
     int queue_id = get_queue_id(shared_mem, cashier_id);
 
+    if (queue_id == -1) {
+        return; //kolejka nie istnieje
+    }
+
     if (msgctl(queue_id, IPC_RMID, NULL) == -1) {
         perror("Błąd usuwania kolejki komunikatów");
     } else {
-         printf("Kolejka komunikatów dla kasjera %d została usunięta.\n", cashier_id);
+        printf("Kolejka komunikatów dla kasjera %d została usunięta.\n", cashier_id);
+
+        // Zaktualizowanie pamięci dzielonej: ustawienie kolejki na -1
+        set_queue_id(shared_mem, cashier_id, -1);
+    }
+}
+
+void cleanup_all_queues() {
+    for (int i = 1; i <= MAX_CASHIERS; i++) { //od jedynki ponieważ kasjerzy mają id od 1 do 10
+        cleanup_queue(i);
     }
 }
 
