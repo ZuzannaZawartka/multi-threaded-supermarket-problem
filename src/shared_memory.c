@@ -26,7 +26,7 @@ SharedMemory* init_shared_memory() {
         exit(1);
     }
 
-    // Tworzymy semafor, jeśli jeszcze nie istnieje
+    // Tworzymy semafor do shared memory, jeśli jeszcze nie istnieje
     sem_t* shared_mem_semaphore = sem_open(SEM_NAME, O_CREAT, 0666, 1);
     if (shared_mem_semaphore == SEM_FAILED) {
         perror("Błąd tworzenia semafora");
@@ -38,7 +38,6 @@ SharedMemory* init_shared_memory() {
         perror("Błąd zwolnienia semafora");
         exit(1);
     }
-
 
     // Inicjalizacja tablicy queue_ids
     for (int i = 0; i < MAX_CASHIERS; i++) {
@@ -62,7 +61,6 @@ void set_queue_id(SharedMemory* shared_mem, int cashier_id, int queue_id) {
     // Sprawdzenie poprawności indeksu
     if (cashier_id >= 0 && cashier_id < MAX_CASHIERS) {
         shared_mem->queue_ids[cashier_id-1] = queue_id;
-        printf("Zaktualizowano identyfikator kolejki kasjera %d: %d\n", cashier_id, queue_id);
     } else {
         fprintf(stderr, "Błąd: invalid cashier_id: %d\n", cashier_id);
     }
@@ -144,7 +142,7 @@ sem_t* get_semaphore() {
     // Uzyskanie semafora
     sem_t* sem = sem_open(semaphore_name, 0);  // Otwieranie istniejącego semafora
     if (sem == SEM_FAILED) {
-        perror("Błąd otwierania semafora");
+        perror("Błąd otwierania semafora shared");
         return NULL;
     }
 

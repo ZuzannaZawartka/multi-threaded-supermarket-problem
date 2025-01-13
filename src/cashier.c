@@ -13,9 +13,7 @@
 
 // Tablica przechowująca identyfikatory kolejek dla kasjerów (max 10)
 extern SharedMemory* shared_mem; // Deklaracja pamięci dzielonej
-
 extern pthread_mutex_t mutex;
-extern pthread_cond_t cond;
 extern int current_cashiers;
 
 
@@ -80,13 +78,30 @@ void* cashier_function(void* arg) {
 
     cleanup_queue(cashier_id);  // Czyszczenie kolejki kasjera
     decrement_cashiers();
-
     pthread_exit(NULL);
 }
 
 void handle_cashier_signal(int sig) {
-    cleanup_all_queues(); //czyszczenie wszystkich kolejek
+    decrement_cashiers(); //zmniejszamy liczbe
     pthread_exit(NULL);  // Kasjer kończy pracę
+}
+
+//TU COS NIE GRA
+void wait_for_cashiers(pthread_t* cashier_threads, int num_cashiers) {
+    void* status;
+    for (int i = 0; i < num_cashiers; i++) {
+        pthread_t cashier_thread = get_cashier_thread(cashier_threads, i);
+
+        // Sprawdzamy, czy wątek kasjera jest zainicjowany
+        if (cashier_thread != 0) {
+            int ret = pthread_join(cashier_thread, &status);  // Czeka na zakończenie wątku
+            if (ret == 0) {
+                printf("Wątek kasjera %d zakończył się z kodem: %ld, ttid: %lu\n", i, (long)status, cashier_thread);
+            } else {
+                printf("Błąd podczas oczekiwania na zakończenie wątku kasjera %d\n", i);
+            }
+        }
+    }
 }
 
 
@@ -97,34 +112,19 @@ void cleanup_queue(int cashier_id) {
     if (queue_id == -1) {
         return; //kolejka nie istnieje
     }
-
     if (msgctl(queue_id, IPC_RMID, NULL) == -1) {
         perror("Błąd usuwania kolejki komunikatów");
     } else {
         printf("Kolejka komunikatów dla kasjera %d została usunięta.\n", cashier_id);
 
         // Zaktualizowanie pamięci dzielonej: ustawienie kolejki na -1
-        set_queue_id(shared_mem, cashier_id, -1);
+        // set_queue_id(shared_mem, cashier_id, -1);
     }
 }
 
-void cleanup_all_queues() {
+//wywolywane z poziomu manadzera
+void cleanAfterCashiers() {
     for (int i = 1; i <= MAX_CASHIERS; i++) { //od jedynki ponieważ kasjerzy mają id od 1 do 10
         cleanup_queue(i);
-    }
-}
-
-void wait_for_cashiers(pthread_t* cashier_threads, int num_cashiers) {
-    void* status;
-    for (int i = 0; i < num_cashiers; i++) {
-        // Używamy funkcji get_cashier_thread do bezpiecznego odczytu wątku kasjera
-        pthread_t cashier_thread = get_cashier_thread(cashier_threads, i);
-
-        int ret = pthread_join(cashier_thread, &status);  // Czeka na zakończenie wątku
-        if (ret == 0) {
-            printf("Wątek kasjera %d zakończył się z kodem: %ld , ttid:%lu\n", i, (long)status, cashier_thread);
-        } else {
-            printf("Błąd podczas oczekiwania na zakończenie wątku kasjera %d\n", i);
-        }
     }
 }

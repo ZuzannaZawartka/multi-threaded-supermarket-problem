@@ -82,6 +82,9 @@ void handle_customer_signal(int sig) {
     printf("Klient %d: Odebrałem sygnał pożaru! Rozpoczynam ewakuację...\n", getpid());
     printf("Klient %d: Opuszczam sklep.\n", getpid());
     remove_process(getpid());
+    if (safe_sem_post() == -1) {  // Zabezpieczona funkcja sem_post
+            exit(1);  // W przypadku błędu, kończymy proces
+    }
     exit(0);
 }
 
@@ -89,7 +92,6 @@ void handle_customer_signal(int sig) {
 //wylaczenie tworzenia nowych customerow
 void handle_customer_signal2(int sig) {
     cleanup_processes();  // Oczyszczenie pamięci związanej z procesami
-    destroy_semaphore_customer();  // Zwalniamy semafor
     pthread_exit(NULL); 
 }
 
@@ -99,10 +101,9 @@ void* create_customer_processes(void* arg) {
     signal(SIGUSR2, handle_customer_signal2);
 
     init_semaphore_customer();
-    sem_t* semaphore = get_semaphore_customer();  // Pobieramy semafor
    
     while (1) {  // Generowanie klientów w nieskończoność
-        if (safe_sem_wait(semaphore) == -1) {  // Zabezpieczona funkcja sem_wait
+        if (safe_sem_wait() == -1) {  // Zabezpieczona funkcja sem_wait
             exit(1);  // W przypadku błędu, kończymy proces
         }
 
@@ -125,18 +126,17 @@ void* create_customer_processes(void* arg) {
             // Wywołanie funkcji, która obsługuje zachowanie klienta
             customer_function(data);  // Klient działa, przypisany do danego kasjera
 
-            if (safe_sem_post(semaphore) == -1) {  // Zabezpieczona funkcja sem_post
+            if (safe_sem_post() == -1) {  // Zabezpieczona funkcja sem_post
                 exit(1);  // W przypadku błędu, kończymy proces
             }
-            get_customers_in_shop(semaphore); //ilosc osob po wyjsciu ze sklepu
+            get_customers_in_shop(); //ilosc osob po wyjsciu ze sklepu
 
             exit(0);
         } else if (pid < 0) {
             perror("Błąd tworzenia procesu klienta");
             
-            if (sem_post(semaphore) == -1) {
-                perror("Błąd podczas podnoszenia semafora po zakończeniu klienta");
-                exit(1);
+            if (safe_sem_post() == -1) {  // Zabezpieczona funkcja sem_post
+                exit(1);  // W przypadku błędu, kończymy proces
             }
             exit(1);
         }
@@ -144,13 +144,13 @@ void* create_customer_processes(void* arg) {
         // Zapisz PID klienta w process managerze
         add_process(pid);
 
-        get_customers_in_shop(semaphore);
+        get_customers_in_shop();
         // Losowy czas na następnego klienta
-        sleep(generate_random_time(1, 3));  // Klient może przyjść w losowych odstępach czasu
+        sleep(generate_random_time(10, 15));  // Klient może przyjść w losowych odstępach czasu
     }
 
-    // Zamykamy semafor po zakończeniu tworzenia procesów
-    sem_close(semaphore);
+    // // Zamykamy semafor po zakończeniu tworzenia procesów
+    // destroy_semaphore_customer();
 
     return NULL;  // Funkcja musi zwracać 'void*'
 }
@@ -213,11 +213,15 @@ void init_semaphore_customer() {
         }
     }
     printf("Semafor został zainicjalizowany z wartością 100.\n");
-    sem_close(semaphore);
 }
 
-
 void destroy_semaphore_customer() {
+    //  sem_t* semaphore = get_semaphore_customer();  // Pobierz semafor
+
+    // // Zamknij semafor w bieżącym wątku
+    // sem_close(semaphore);  
+
+    // Usuń semafor z przestrzeni nazw
     if (sem_unlink(SEMAPHORE_NAME) == -1) {
         perror("Błąd usuwania semafora");
     } else {
@@ -226,35 +230,38 @@ void destroy_semaphore_customer() {
 }
 
 
+
 sem_t* get_semaphore_customer() {
     sem_t* semaphore = sem_open(SEMAPHORE_NAME, 0);  // Otwieramy istniejący semafor
     if (semaphore == SEM_FAILED) {
-        perror("Błąd otwierania semafora");
+        perror("Błąd otwierania semafora customer");
         exit(1);
     }
     return semaphore;
 }
 
 // Funkcja odczytująca ile osób jest aktualnie w sklepie
-void get_customers_in_shop(sem_t *semaphore) {
+int get_customers_in_shop() {
+    sem_t* semaphore = get_semaphore_customer();  // Pobieramy semafor bezpośrednio wewnątrz funkcji
+
     int value;
     if (sem_getvalue(semaphore, &value) == -1) {
         perror("Błąd podczas odczytu wartości semafora");
-        return;
+        return -1;
     }
+
     // Liczba osób w sklepie to różnica pomiędzy maksymalną wartością semafora a aktualną wartością semafora
     int customers_in_shop = 100 - value;
     printf("Aktualna liczba osób w sklepie: %d / 100\n", customers_in_shop);
+    return customers_in_shop;
 }
 
 
-int safe_sem_wait(sem_t *semaphore) {
-    if (semaphore == NULL) {
-        fprintf(stderr, "Błąd: Semafor nie został zainicjowany.\n");
-        return -1;  // Zwracamy -1, aby wskazać błąd
-    }
-    
-    int result = sem_wait(semaphore);
+
+int safe_sem_wait() {
+    sem_t* semaphore = get_semaphore_customer();  // Pobieramy semafor bezpośrednio wewnątrz funkcji
+
+    int result = sem_wait(semaphore);  // Oczekiwanie na semafor
     if (result == -1) {
         perror("Błąd podczas oczekiwania na semafor");
         return -1;  // Zwracamy -1 w przypadku błędu
@@ -264,13 +271,11 @@ int safe_sem_wait(sem_t *semaphore) {
 }
 
 
-int safe_sem_post(sem_t *semaphore) {
-    if (semaphore == NULL) {
-        fprintf(stderr, "Błąd: Semafor nie został zainicjowany.\n");
-        return -1;  // Zwracamy -1, aby wskazać błąd
-    }
 
-    int result = sem_post(semaphore);
+int safe_sem_post() {
+    sem_t* semaphore = get_semaphore_customer();  // Pobieramy semafor bezpośrednio wewnątrz funkcji
+
+    int result = sem_post(semaphore);  // Podnosimy semafor
     if (result == -1) {
         perror("Błąd podczas podnoszenia semafora");
         return -1;  // Zwracamy -1 w przypadku błędu
@@ -278,5 +283,3 @@ int safe_sem_post(sem_t *semaphore) {
 
     return 0;  // Zwracamy 0, jeśli operacja zakończyła się sukcesem
 }
-
-

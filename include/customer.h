@@ -37,11 +37,11 @@ void destroy_semaphore_customer();
 
 sem_t* get_semaphore_customer();
 
-void get_customers_in_shop(sem_t *semaphore);
+int get_customers_in_shop();
 
 
-int safe_sem_wait(sem_t *semaphore);
-int safe_sem_post(sem_t *semaphore);
+int safe_sem_wait();
+int safe_sem_post();
 
 
 #endif

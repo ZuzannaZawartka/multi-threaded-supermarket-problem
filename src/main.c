@@ -20,14 +20,9 @@
 
 int NUM_CUSTOMERS  = 5 ;// Liczba klientów (tymczasowo)
 
-
 SharedMemory* shared_mem;
-sem_t* shared_mem_semaphore; // Semafor dla synchronizacji dostępu do pamięci dzielonej
 pthread_t monitor_thread;  // Declare it as a global variable
-
 pthread_t customer_thread;
-
-
 
 void send_signal_to_manager(int signal) {
     if (pthread_kill(monitor_thread, signal) != 0) {
@@ -41,36 +36,18 @@ void send_signal_to_customers(int signal) {
     }
 }
 
-
-// // // Handler dla SIGINT w głównym wątku
 void mainHandlerProcess(int signum) {
-    printf("Sygnał SIGINT otrzymany w głównym wątku. Wysyłam sygnał do menedżera kasjerów.\n");
     send_signal_to_manager(SIGTERM);  // Wysyłanie sygnału do wątku menedżera
     send_signal_to_customers(SIGUSR2);  // Wysyłanie sygnału do wątku menedżera
 }
 
-
-
-
 int main() {
     srand(time(NULL));  
 
-    // Rejestracja handlera sygnału SIGINT
-    // signal(SIGINT, sigint_handler1);
-     // Rejestracja handlera SIGINT
-    signal(SIGINT, mainHandlerProcess);
-
-//    // Inicjalizacja semafora i pamięci dzielonej
-//     init_semaphore();
+    signal(SIGINT, mainHandlerProcess);// Rejestracja handlera SIGINT
     shared_mem = init_shared_memory();
-
-
     // Tworzenie wątku dla managera kasjerow
     init_manager(&monitor_thread);
-
-
-    // Tworzenie procesów klientów
-    // create_customer_processes(NUM_CUSTOMERS,DEFAULT_CASHIERS);
 
     // Tworzenie wątku dla klientów
     if (pthread_create(&customer_thread, NULL, create_customer_processes, NULL) != 0) {
@@ -78,26 +55,15 @@ int main() {
         exit(1);
     }
 
-
     // Czekanie na zakończenie procesów klientów
-    wait_for_customers(NUM_CUSTOMERS);
-
+    wait_for_customers();
 
     terminate_manager(monitor_thread);
-
-    // // Czyszczenie semafora
-    // cleanup_semaphore();
-
 
     //Czyszczenie pamięci dzielonej
     cleanup_shared_memory(shared_mem);
 
+    printf("KONIEC");
     return 0;
 }
-
-
-
-//dodac tego menadzera kasjerow ktory monitoruje liczbe ludzi w sklepie i na podstawie tego dodaje kasjerow
-
-//dodac strazaka
 
