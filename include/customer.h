@@ -2,6 +2,8 @@
 #define CUSTOMER_H
 
 #include <sys/types.h>
+#include <semaphore.h>
+
 
 #define MAX_CUSTOMERS 100  // Maksymalna liczba klientów
 
@@ -13,17 +15,33 @@ typedef struct {
 void* customer_function(void* arg); 
 
 //funkcja tworząca proces klienta
-void create_customer_processes(int num_customers, int num_cashiers);
+void* create_customer_processes(void* arg) ;
 
 
 //czekanie aż każdy proces zakończy się
-void wait_for_customers(int num_customers);
+void wait_for_customers() ;
+
+
 
 //zamknięcie wszystkich procesów
 void terminate_all_customers();
 
 //generowanie czasu randomowego z zakresu min - max
 int generate_random_time(int min_time, int max_time);
+
+void handle_customer_signal(int sig);
+
+
+void init_semaphore_customer();
+void destroy_semaphore_customer();
+
+sem_t* get_semaphore_customer();
+
+void get_customers_in_shop(sem_t *semaphore);
+
+
+int safe_sem_wait(sem_t *semaphore);
+int safe_sem_post(sem_t *semaphore);
 
 
 #endif

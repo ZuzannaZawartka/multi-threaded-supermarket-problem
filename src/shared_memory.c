@@ -4,13 +4,14 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <semaphore.h>  // Załączamy semafor
-
+#include <sys/msg.h>  // Nagłówek do obsługi kolejek komunikatów
 #include "shared_memory.h"
+#include <fcntl.h>
 
 #define SHM_KEY 12345  // Klucz do pamięci dzielonej
-
+#define SEM_NAME "/shared_mem_semaphore" 
 // Inicjalizowanie pamięci dzielonej z semaforem POSIX
-SharedMemory* init_shared_memory(sem_t* shared_mem_semaphore) {
+SharedMemory* init_shared_memory() {
     // Tworzenie pamięci dzielonej
     int shm_id = shmget(SHM_KEY, sizeof(SharedMemory), 0666 | IPC_CREAT);
     if (shm_id == -1) {
@@ -25,12 +26,19 @@ SharedMemory* init_shared_memory(sem_t* shared_mem_semaphore) {
         exit(1);
     }
 
-    // Inicjalizacja zmiennych w pamięci dzielonej
-    shared_mem->should_exit = 0;
-    shared_mem->number_customer = 0;
+    // Tworzymy semafor, jeśli jeszcze nie istnieje
+    sem_t* shared_mem_semaphore = sem_open(SEM_NAME, O_CREAT, 0666, 1);
+    if (shared_mem_semaphore == SEM_FAILED) {
+        perror("Błąd tworzenia semafora");
+        exit(1);
+    }
 
-    // Przypisanie semafora, który będzie używany przez wszystkie wątki i procesy
-    shared_mem->semaphore = shared_mem_semaphore;
+   // Zwolnienie semafora
+    if (sem_post(shared_mem_semaphore) == -1) {
+        perror("Błąd zwolnienia semafora");
+        exit(1);
+    }
+
 
     // Inicjalizacja tablicy queue_ids
     for (int i = 0; i < MAX_CASHIERS; i++) {
@@ -40,85 +48,124 @@ SharedMemory* init_shared_memory(sem_t* shared_mem_semaphore) {
     return shared_mem;
 }
 
-// Czyszczenie pamięci dzielonej
+void set_queue_id(SharedMemory* shared_mem, int cashier_id, int queue_id) {
+    // Uzyskanie semafora
+    sem_t* sem = get_semaphore();
+    if (sem == NULL) {
+        perror("Błąd uzyskiwania semafora");
+        return;
+    }
+
+    // Synchronizacja za pomocą semafora
+    sem_wait(sem);  // Blokowanie dostępu do pamięci dzielonej
+
+    // Sprawdzenie poprawności indeksu
+    if (cashier_id >= 0 && cashier_id < MAX_CASHIERS) {
+        shared_mem->queue_ids[cashier_id-1] = queue_id;
+        printf("Zaktualizowano identyfikator kolejki kasjera %d: %d\n", cashier_id, queue_id);
+    } else {
+        fprintf(stderr, "Błąd: invalid cashier_id: %d\n", cashier_id);
+    }
+
+    sem_post(sem);  // Zwolnienie semafora
+}
+
+
+
+int get_queue_id(SharedMemory* shared_mem, int cashier_id) {
+    // Uzyskanie semafora
+    sem_t* sem = get_semaphore();
+    if (sem == NULL) {
+        perror("Błąd uzyskiwania semafora");
+        return -1;
+    }
+
+    // Synchronizacja za pomocą semafora
+    sem_wait(sem);  // Blokowanie dostępu do pamięci dzielonej
+    int queue_id = shared_mem->queue_ids[cashier_id-1];
+    sem_post(sem);  // Zwolnienie semafora
+
+    return queue_id;
+}
+
+
+
+// Funkcja zwracająca wskaźnik do pamięci dzielonej
+SharedMemory* get_shared_memory() {
+    // Przyłączenie do istniejącej pamięci dzielonej
+    int shm_id = shmget(SHM_KEY, sizeof(SharedMemory), 0666);
+    if (shm_id == -1) {
+        perror("Błąd przyłączenia do pamięci dzielonej");
+        exit(1);
+    }
+
+    SharedMemory* shared_mem = (SharedMemory*)shmat(shm_id, NULL, 0);
+    if (shared_mem == (void*)-1) {
+        perror("Błąd przypisania pamięci dzielonej");
+        exit(1);
+    }
+
+    return shared_mem;
+}
+
+
 void cleanup_shared_memory(SharedMemory* shared_mem) {
+    sem_t* sem = get_semaphore();
+    if (sem == NULL) {
+        perror("Błąd uzyskiwania semafora do sprzątania");
+        return;
+    }
+    // Synchronizacja za pomocą semafora
+    sem_wait(sem);  // Blokowanie dostępu do pamięci dzielonej
+
+    // Odłączenie pamięci dzielonej
     if (shmdt(shared_mem) == -1) {
         perror("Błąd odłączania pamięci dzielonej");
     }
 
-    // Usunięcie pamięci dzielonej
+    // Usunięcie segmentu pamięci dzielonej
     int shm_id = shmget(SHM_KEY, sizeof(SharedMemory), 0666);
     if (shm_id != -1) {
         if (shmctl(shm_id, IPC_RMID, NULL) == -1) {
             perror("Błąd usuwania pamięci dzielonej");
         } else {
-            printf("Pamięć dzielona usunięta\n");
+            printf("Pamięć dzielona została poprawnie usunięta\n");
         }
     }
+
+    sem_post(sem);  // Zwolnienie semafora
+    // Czyszczenie semafora
+    cleanup_semaphore();
 }
 
-// Ustawienie flagi "should_exit" z synchronizacją semaforem
-void set_should_exit(SharedMemory* shared_mem, int value) {
-    sem_wait(shared_mem->semaphore);  
-    shared_mem->should_exit = value;
-    sem_post(shared_mem->semaphore);  
-}
+sem_t* get_semaphore() {
+    const char* semaphore_name = "/shared_mem_semaphore";
+    
+    // Uzyskanie semafora
+    sem_t* sem = sem_open(semaphore_name, 0);  // Otwieranie istniejącego semafora
+    if (sem == SEM_FAILED) {
+        perror("Błąd otwierania semafora");
+        return NULL;
+    }
 
-
-int get_should_exit(SharedMemory* shared_mem) {
-    sem_wait(shared_mem->semaphore);  
-    int value = shared_mem->should_exit;
-    sem_post(shared_mem->semaphore);  
-    return value;
-}
-
-// Ustawienie identyfikatora kolejki kasjera z synchronizacją semaforem
-void set_queue_id(SharedMemory* shared_mem, int cashier_id, int queue_id) {
-    sem_wait(shared_mem->semaphore);  
-    shared_mem->queue_ids[cashier_id] = queue_id;
-    sem_post(shared_mem->semaphore);  
-}
-
-// Pobranie identyfikatora kolejki kasjera z synchronizacją semaforem
-int get_queue_id(SharedMemory* shared_mem, int cashier_id) {
-    sem_wait(shared_mem->semaphore);  
-    int queue_id = shared_mem->queue_ids[cashier_id];
-    sem_post(shared_mem->semaphore);  
-    return queue_id;
-}
-
-// Inkrementacja liczby klientów w sklepie z synchronizacją semaforem
-void increment_number_customer(SharedMemory* shared_mem) {
-    sem_wait(shared_mem->semaphore);  
-    shared_mem->number_customer++;     // Zwiększamy liczbę klientów
-    sem_post(shared_mem->semaphore);  
-}
-
-// Dekrementacja liczby klientów w sklepie z synchronizacją semaforem
-void decrement_number_customer(SharedMemory* shared_mem) {
-    sem_wait(shared_mem->semaphore);  
-    shared_mem->number_customer--;     // Zmniejszamy liczbę klientów
-    sem_post(shared_mem->semaphore);  
-}
-
-// Pobranie liczby aktualnych klientów z synchronizacją semaforem
-int get_number_customer(SharedMemory* shared_mem) {
-    sem_wait(shared_mem->semaphore);  
-    int current_customers = shared_mem->number_customer;  // Zapisujemy aktualną liczbę klientów
-    sem_post(shared_mem->semaphore);  
-    return current_customers;  
+    return sem;
 }
 
 
-void set_active_cashiers(SharedMemory* shared_mem, int value) {
-    sem_wait(shared_mem->semaphore);  
-    shared_mem->active_cashiers = value; 
-    sem_post(shared_mem->semaphore);  
-}
+void cleanup_semaphore() {
+    sem_t* sem = sem_open("/shared_mem_semaphore", 0);
+    if (sem == SEM_FAILED) {
+        perror("Błąd otwierania semafora do zamknięcia");
+        return;
+    }
 
-int get_active_cashiers(SharedMemory* shared_mem) {
-    sem_wait(shared_mem->semaphore); 
-    int active_cashiers = shared_mem->active_cashiers; 
-    sem_post(shared_mem->semaphore);  
-    return active_cashiers;
+    if (sem_close(sem) == -1) {
+        perror("Błąd zamykania semafora");
+    }
+
+    if (sem_unlink("/shared_mem_semaphore") == -1) {
+        perror("Błąd usuwania semafora");
+    } else {
+        printf("Semafor został poprawnie usunięty shared memory\n");
+    }
 }

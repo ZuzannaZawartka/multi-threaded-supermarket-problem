@@ -35,7 +35,7 @@ void remove_process(pid_t pid) {
     }
 
     if (current == NULL) {
-        printf("PID %d nie znaleziono w liście\n", pid);
+        // printf("PID %d nie znaleziono w liście\n", pid);
         return; 
     }
 
@@ -61,6 +61,7 @@ int process_exists(pid_t pid) {
 
 
 void cleanup_processes() {
+
     ProcessNode* current = process_list;
 
     while (current != NULL) {
