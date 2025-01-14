@@ -9,6 +9,7 @@
 #include "shared_memory.h"
 #include <signal.h>
 #include "manager_cashiers.h"
+#include "customer.h"
 
 
 // Tablica przechowująca identyfikatory kolejek dla kasjerów (max 10)
@@ -43,6 +44,7 @@ void* cashier_function(void* arg) {
 
     // Rejestracja handlera sygnału SIGUSR1
     signal(SIGHUP, handle_cashier_signal);
+    signal(SIGUSR1, sigUsr2Handler);
 
     Message message;
 
@@ -81,15 +83,26 @@ void* cashier_function(void* arg) {
     pthread_exit(NULL);
 }
 
+void sigUsr2Handler(int signum) {
+    printf("Kasjer otrzymał sygnał SIGUSR2. Wykonuję specjalne zadania.WWWWWWWWWWWWWWWWWWWWWWWWWW\n");
+    // Wstaw kod odpowiednich działań dla SIGUSR2
+    pthread_exit(NULL);  // Na przykład zakończenie pracy kasjera
+}
+
 void handle_cashier_signal(int sig) {
-    decrement_cashiers(); //zmniejszamy liczbe
+    // Kasjer czeka, aż wszyscy klienci opuszczą sklep
+    while (get_customers_in_shop() > 0) {
+        printf("Kasjer Pozostali klienci w sklepie: %d\n", get_customers_in_shop());
+        sleep(1); // Czekamy na wyjście klientów
+    }
+    decrement_cashiers(); // Zmniejszamy liczbę kasjerów
     pthread_exit(NULL);  // Kasjer kończy pracę
 }
 
 //TU COS NIE GRA
 void wait_for_cashiers(pthread_t* cashier_threads, int num_cashiers) {
     void* status;
-    for (int i = 0; i < num_cashiers; i++) {
+    for (int i = 0; i <= num_cashiers; i++) {
         pthread_t cashier_thread = get_cashier_thread(cashier_threads, i);
 
         // Sprawdzamy, czy wątek kasjera jest zainicjowany
@@ -115,10 +128,10 @@ void cleanup_queue(int cashier_id) {
     if (msgctl(queue_id, IPC_RMID, NULL) == -1) {
         perror("Błąd usuwania kolejki komunikatów");
     } else {
-        printf("Kolejka komunikatów dla kasjera %d została usunięta.\n", cashier_id);
+        printf("Kolejka komunikatów dla kasjera %d została usunięta.\n", cashier_id-1);
 
         // Zaktualizowanie pamięci dzielonej: ustawienie kolejki na -1
-        // set_queue_id(shared_mem, cashier_id, -1);
+        set_queue_id(shared_mem, cashier_id, -1);
     }
 }
 

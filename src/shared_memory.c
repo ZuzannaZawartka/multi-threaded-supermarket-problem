@@ -59,7 +59,7 @@ void set_queue_id(SharedMemory* shared_mem, int cashier_id, int queue_id) {
     sem_wait(sem);  // Blokowanie dostępu do pamięci dzielonej
 
     // Sprawdzenie poprawności indeksu
-    if (cashier_id >= 0 && cashier_id < MAX_CASHIERS) {
+    if (cashier_id > 0 && cashier_id <= MAX_CASHIERS) {
         shared_mem->queue_ids[cashier_id-1] = queue_id;
     } else {
         fprintf(stderr, "Błąd: invalid cashier_id: %d\n", cashier_id);

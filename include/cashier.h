@@ -16,6 +16,6 @@ void* cashier_function(void* arg);
 void wait_for_cashiers(pthread_t* cashier_threads, int num_cashiers);
 void handle_cashier_signal(int sig);
 void cleanAfterCashiers();
-
+void sigUsr2Handler(int signum) ;
 
 #endif
