@@ -4,7 +4,9 @@
 #include <pthread.h>
 #include <signal.h>
 
-
+#define MIN_PEOPLE_FOR_CASHIER 5  // Na każdą grupę 5 klientów przypada jeden kasjer
+#define MAX_CASHIERS 10 
+#define MIN_CASHIERS 2
 
 // Funkcja menedżera kasjerów, która monitoruje liczbę klientów
 void* manage_customers(void* arg);

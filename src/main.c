@@ -63,6 +63,8 @@ int main() {
     //Czyszczenie pamięci dzielonej
     cleanup_shared_memory(shared_mem);
 
+    destroy_semaphore_customer();
+
     printf("KONIEC");
     return 0;
 }

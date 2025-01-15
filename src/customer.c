@@ -16,24 +16,44 @@
 #include <semaphore.h>
 #include <fcntl.h>  // Dla O_CREAT, O_EXCL
 #include <sys/stat.h>  // Dla S_IRUSR, S_IWUSR
+// #include "manager_cashiers.h"
+#define MIN_CASHIERS 2
 
+#define SEMAPHORE_NAME "/customer_semaphore"
 
-#define SEMAPHORE_NAME "/customer_semaphore" 
 
 extern SharedMemory* shared_mem;  // Dostęp do pamięci dzielonej
 sem_t customer_semaphore; 
 
+volatile int terminate_customers = 0;
+
+
+void setup_signal_handler_for_customers() {
+    struct sigaction sa;
+    sa.sa_sigaction = handle_customer_signal;  // Obsługuje sygnał dla klienta
+    sa.sa_flags = SA_SIGINFO;  // Użyj flagi SA_SIGINFO, aby otrzymać więcej informacji o sygnale
+    sigemptyset(&sa.sa_mask);  // Zainicjuj maskę sygnałów
+    if (sigaction(SIGINT, &sa, NULL) == -1) {  // Obsługuje sygnał SIGINT
+        perror("Błąd przy ustawianiu handlera dla SIGINT");
+        exit(1);
+    }
+
+}
+
+
 
 void* customer_function(void* arg) {
 
-    signal(SIGINT, handle_customer_signal); // handler na sygnał i wyjściu
+    setup_signal_handler_for_customers();
+
+    // signal(SIGINT, handle_customer_signal); // handler na sygnał i wyjściu
 
     CustomerData* data = (CustomerData*)arg;  // Odczytanie danych z przekazanej struktury
     pid_t pid = getpid();
     int cashier_id = data->cashier_id;  // Kasjer, do którego klient wysyła komunikat
-    int stay_time = generate_random_time(1,2);
+    int stay_time = generate_random_time(30,60);
 
-    printf("Klient %d przybył do sklepu i będzie czekał przez %d sekund.\n", pid, stay_time);
+    printf("Klient %d przybył do sklepu i będzie czekał przez %d sekund. \n", pid, stay_time);
 
     // Cykliczne sprawdzanie flagi, czy pożar jest aktywny
     time_t start_time = time(NULL);  // Czas rozpoczęcia chodzenia klienta po sklepie
@@ -78,20 +98,21 @@ void* customer_function(void* arg) {
 }
 
 
-void handle_customer_signal(int sig) {
-    printf("Klient %d: Odebrałem sygnał pożaru! Rozpoczynam ewakuację...\n", getpid());
-    printf("Klient %d: Opuszczam sklep.\n", getpid());
-    remove_process(getpid());
+void handle_customer_signal(int sig, siginfo_t *info, void *ucontext) {
+
     if (safe_sem_post() == -1) {  // Zabezpieczona funkcja sem_post
             exit(1);  // W przypadku błędu, kończymy proces
     }
+
+    printf("Klient %d: Opuszczam sklep.\n", getpid());
+    // remove_process(getpid());
     exit(0);
 }
 
 
 //wylaczenie tworzenia nowych customerow
 void handle_customer_signal2(int sig) {
-    cleanup_processes();  // Oczyszczenie pamięci związanej z procesami
+    terminate_customers =1;
     pthread_exit(NULL); 
 }
 
@@ -101,14 +122,20 @@ void* create_customer_processes(void* arg) {
     signal(SIGUSR2, handle_customer_signal2);
 
     init_semaphore_customer();
-   
+
+    while(get_active_cashiers(shared_mem)<MIN_CASHIERS){ //czekamy na stworzenie sie kasjerow
+        sleep(1);
+    }
+
     while (1) {  // Generowanie klientów w nieskończoność
         if (safe_sem_wait() == -1) {  // Zabezpieczona funkcja sem_wait
             exit(1);  // W przypadku błędu, kończymy proces
         }
 
+        printf("Aktualna liczba osób w sklepie:  %d/100\n", get_customers_in_shop());
+
         // Losowy wybór kasjera dla klienta
-        int customer_cashier_id = rand() % 2 + 1; //2 ZAMIENIC NA KASJEROW
+        int customer_cashier_id = rand() % get_active_cashiers(shared_mem) + 1; 
 
         pid_t pid = fork();  // Tworzenie nowego procesu klienta
 
@@ -129,6 +156,8 @@ void* create_customer_processes(void* arg) {
             if (safe_sem_post() == -1) {  // Zabezpieczona funkcja sem_post
                 exit(1);  // W przypadku błędu, kończymy proces
             }
+    
+            
             get_customers_in_shop(); //ilosc osob po wyjsciu ze sklepu
 
             exit(0);
@@ -146,7 +175,7 @@ void* create_customer_processes(void* arg) {
 
         get_customers_in_shop();
         // Losowy czas na następnego klienta
-        sleep(generate_random_time(10, 15));  // Klient może przyjść w losowych odstępach czasu
+        sleep(generate_random_time(0, 1));  // Klient może przyjść w losowych odstępach czasu
     }
 
     // // Zamykamy semafor po zakończeniu tworzenia procesów
@@ -155,41 +184,37 @@ void* create_customer_processes(void* arg) {
     return NULL;  // Funkcja musi zwracać 'void*'
 }
 
-
 void wait_for_customers() {
-   int status;
+    int status;
 
-    // Czekamy na klientów, jeśli lista jest pusta
+    // Pętla czekająca na zakończenie wszystkich procesów klientów.
     while (1) {
-        if (process_list != NULL) {
-            break;  // Jeśli lista nie jest pusta, wychodzimy z pętli
-        }
-
-        printf("Brak procesów klientów. Czekam na nowych klientów...\n");
-        sleep(1);  // Krótkie opóźnienie, aby dać czas na dodanie nowych procesów
-    }
-
-    // Pętla oczekująca na zakończenie procesów klientów
-    while (process_list != NULL) {
-        pid_t finished_pid = waitpid(-1, &status, WNOHANG);  // Sprawdzamy, czy jakieś procesy już zakończone
+        // Sprawdzamy zakończone procesy
+        pid_t finished_pid = waitpid(-1, &status, WNOHANG);  // Sprawdzamy zakończone procesy
         if (finished_pid > 0) {
-            // Jeśli proces zakończony, usuwamy go z listy
-            printf("Proces klienta %d zakończony.\n", finished_pid);
-            remove_process(finished_pid);  // Usuwamy PID zakończonego procesu z listy
+            // Jeżeli proces zakończony, usuwamy go z listy
+            remove_process(finished_pid);  // Usuwamy PID z listy
+
+            // printf("Proces klienta %d zakończony, zwiększam semafor. Miejsca w sklepie zostały zwolnione.\n", finished_pid);
         } else if (finished_pid == 0) {
-            // Jeśli brak zakończonych procesów, czekamy i próbujemy ponownie
-            //W sklepie nie zawsze są klienci
-            sleep(1);
+            // Jeśli nie ma zakończonych procesów, po prostu czekamy
+            sleep(1);  // Czekaj, jeśli brak zakończonych procesów
         } else {
-            // Obsługujemy błąd, jeśli np. waitpid nie może znaleźć procesu
+            // Obsługujemy błąd (np. brak procesów do oczekiwania)
             if (errno != ECHILD) {
-                perror("Błąd czekania na proces");
+                perror("Błąd czekania na proces w wait_for_customers");
                 exit(1);
             }
         }
+
+        // Sprawdzamy, czy lista procesów jest pusta i czy flaga zakończenia pracy jest ustawiona
+        if (process_list == NULL && terminate_customers == 1) {
+            // Po zakończeniu pracy, czyszczymy wszystkie procesy
+            cleanup_processes();  // Czyszczenie procesów
+            break;  // Kończymy pętlę, ponieważ procesy zakończone i flaga zakończenia pracy jest ustawiona
+        }
     }
 }
-
 
 // Funkcja do generowania losowego czasu (w sekundach)
 int generate_random_time(int min_time, int max_time) {
@@ -198,7 +223,6 @@ int generate_random_time(int min_time, int max_time) {
 
 
 
-//semafor do zliczania maksymalnej ilosci osob w sklepie
 void init_semaphore_customer() {
     sem_t* semaphore = sem_open(SEMAPHORE_NAME, O_CREAT | O_EXCL, S_IRUSR | S_IWUSR, 100);
     if (semaphore == SEM_FAILED) {
@@ -211,17 +235,15 @@ void init_semaphore_customer() {
             perror("Błąd inicjalizacji semafora");
             exit(1);
         }
+    } else {
+        printf("Semafor został zainicjalizowany z wartością 100.\n");
     }
-    printf("Semafor został zainicjalizowany z wartością 100.\n");
 }
 
+
 void destroy_semaphore_customer() {
-    //  sem_t* semaphore = get_semaphore_customer();  // Pobierz semafor
-
-    // // Zamknij semafor w bieżącym wątku
-    // sem_close(semaphore);  
-
-    // Usuń semafor z przestrzeni nazw
+    sem_t* semaphore = get_semaphore_customer();
+    sem_close(semaphore);  // Close the semaphore
     if (sem_unlink(SEMAPHORE_NAME) == -1) {
         perror("Błąd usuwania semafora");
     } else {
@@ -232,13 +254,27 @@ void destroy_semaphore_customer() {
 
 
 sem_t* get_semaphore_customer() {
-    sem_t* semaphore = sem_open(SEMAPHORE_NAME, 0);  // Otwieramy istniejący semafor
+    sem_t* semaphore = sem_open(SEMAPHORE_NAME, O_CREAT | O_EXCL, S_IRUSR | S_IWUSR, 100);
+    
     if (semaphore == SEM_FAILED) {
-        perror("Błąd otwierania semafora customer");
-        exit(1);
+        // Sprawdzamy, czy błąd to EEXIST, który oznacza, że semafor już istnieje
+        if (errno == EEXIST) {
+            // printf("Semafor już istnieje, otwieram go.\n");
+            // Semafor już istnieje, więc otwieramy go
+            semaphore = sem_open(SEMAPHORE_NAME, 0); // Otwieramy istniejący semafor
+            if (semaphore == SEM_FAILED) {
+                perror("Błąd otwierania semafora customer");
+                exit(1);  // Zakończenie programu w przypadku błędu
+            }
+        } else {
+            perror("Błąd otwierania semafora customer");
+            exit(1);  // Zakończenie programu w przypadku błędu
+        }
     }
+    
     return semaphore;
 }
+
 
 // Funkcja odczytująca ile osób jest aktualnie w sklepie
 int get_customers_in_shop() {
@@ -252,34 +288,57 @@ int get_customers_in_shop() {
 
     // Liczba osób w sklepie to różnica pomiędzy maksymalną wartością semafora a aktualną wartością semafora
     int customers_in_shop = 100 - value;
-    printf("Aktualna liczba osób w sklepie: %d / 100\n", customers_in_shop);
+    // printf("Aktualna liczba osób w sklepie: %d / 100\n", customers_in_shop);
     return customers_in_shop;
 }
 
 
-
 int safe_sem_wait() {
-    sem_t* semaphore = get_semaphore_customer();  // Pobieramy semafor bezpośrednio wewnątrz funkcji
-
-    int result = sem_wait(semaphore);  // Oczekiwanie na semafor
-    if (result == -1) {
+    sem_t* semaphore = get_semaphore_customer();
+    while (sem_wait(semaphore) == -1) {
+        if (errno == EINTR) {
+            continue;  // Retry if interrupted
+        }
         perror("Błąd podczas oczekiwania na semafor");
-        return -1;  // Zwracamy -1 w przypadku błędu
+        return -1;
     }
-
-    return 0;  // Zwracamy 0, jeśli operacja zakończyła się sukcesem
+    return 0;
 }
-
-
 
 int safe_sem_post() {
-    sem_t* semaphore = get_semaphore_customer();  // Pobieramy semafor bezpośrednio wewnątrz funkcji
-
-    int result = sem_post(semaphore);  // Podnosimy semafor
-    if (result == -1) {
-        perror("Błąd podczas podnoszenia semafora");
-        return -1;  // Zwracamy -1 w przypadku błędu
+    sem_t* semaphore = get_semaphore_customer();
+    while (sem_post(semaphore) == -1) {
+        if (errno == EINTR) {
+            continue;  // Ponów próbę, jeśli operacja została przerwana sygnałem
+        } else {
+            perror("Błąd podczas podnoszenia semafora");
+            return -1;  // Zwróć -1 w przypadku innych błędów
+        }
     }
 
-    return 0;  // Zwracamy 0, jeśli operacja zakończyła się sukcesem
+    return 0;  // Operacja zakończona sukcesem
 }
+
+
+
+
+// int safe_sem_post() {
+//     sem_t* semaphore = get_semaphore_customer();  // Pobieramy semafor bezpośrednio wewnątrz funkcji
+
+//     int result = sem_post(semaphore);  // Podnosimy semafor
+//     if (result == -1) {
+//         perror("Błąd podczas podnoszenia semafora");
+//         return -1;  // Zwracamy -1 w przypadku błędu
+//     }
+//     printf("WYJSCIE KLIENTA %d",getpid());
+//     return 0;  // Zwracamy 0, jeśli operacja zakończyła się sukcesem
+// }
+
+
+
+
+
+//ps aux | grep 'Z' | grep zawart |grep supermarket |cut -d ' ' -f 2 | xargs kill -9 -usuwanie zombie
+//ps aux |grep zawartk |grep supermarket  -procesy 
+
+//synchronizacaj zeby klienci wchodzi dopiero jak sa kasjerzy

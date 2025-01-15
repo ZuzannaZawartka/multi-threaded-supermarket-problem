@@ -9,6 +9,7 @@
 
 typedef struct {
     int queue_ids[MAX_CASHIERS]; // Tablica kolejki komunikatów
+    int active_cashiers;  
 } SharedMemory;
 
 SharedMemory* init_shared_memory();
@@ -18,5 +19,7 @@ int get_queue_id(SharedMemory* shared_mem, int cashier_id);
 SharedMemory* get_shared_memory() ;
 void cleanup_semaphore();
 sem_t* get_semaphore();
-
+int get_active_cashiers(SharedMemory* shared_mem);
+void decrement_active_cashiers(SharedMemory* shared_mem);
+void increment_active_cashiers(SharedMemory* shared_mem);
 #endif  

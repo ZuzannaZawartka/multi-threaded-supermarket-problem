@@ -11,7 +11,6 @@
 #include "manager_cashiers.h"
 #include "customer.h"
 
-
 // Tablica przechowująca identyfikatory kolejek dla kasjerów (max 10)
 extern SharedMemory* shared_mem; // Deklaracja pamięci dzielonej
 extern pthread_mutex_t mutex;
@@ -65,7 +64,7 @@ void* cashier_function(void* arg) {
 
         printf("Kasjer %d obsługuje klienta o PID = %d\n", cashier_id, message.customer_pid);
 
-        sleep(1);
+        sleep(4);
 
         
         // Wysłanie odpowiedzi do klienta
@@ -84,16 +83,37 @@ void* cashier_function(void* arg) {
 }
 
 void sigUsr2Handler(int signum) {
-    printf("Kasjer otrzymał sygnał SIGUSR2. Wykonuję specjalne zadania.WWWWWWWWWWWWWWWWWWWWWWWWWW\n");
-    // Wstaw kod odpowiednich działań dla SIGUSR2
-    pthread_exit(NULL);  // Na przykład zakończenie pracy kasjera
+    printf("ZAMYKANIE KASY NR : %d  - Zakończę obsługę wszystkich klientów w kolejce.\n", get_current_cashiers());
+
+    // Pobranie identyfikatora kolejki kasjera
+    int queue_id = get_queue_id(shared_mem, get_current_cashiers());
+
+    Message message;
+
+    // Obsługuje wszystkich klientów w kolejce
+    while (msgrcv(queue_id, &message, sizeof(message) - sizeof(long), get_current_cashiers(), IPC_NOWAIT) != -1) {
+        printf("Kasjer obsługujący klienta o PID = %d.\n", message.customer_pid);
+        sleep(1);  // Symulacja obsługi
+
+        // Wysłanie komunikatu o zakończeniu obsługi do klienta
+        message.mtype = message.customer_pid;
+        if (msgsnd(queue_id, &message, sizeof(message) - sizeof(long), 0) == -1) {
+            perror("Błąd wysyłania komunikatu do klienta");
+            exit(1);
+        }
+    }
+
+    // Po zakończeniu obsługi wszystkich klientów kasjer kończy pracę
+    printf("Kasjer zakończył obsługę wszystkich klientów.\n");
+    pthread_exit(NULL);
 }
 
+
 void handle_cashier_signal(int sig) {
-    // Kasjer czeka, aż wszyscy klienci opuszczą sklep
-    while (get_customers_in_shop() > 0) {
-        printf("Kasjer Pozostali klienci w sklepie: %d\n", get_customers_in_shop());
-        sleep(1); // Czekamy na wyjście klientów
+
+    while (get_customers_in_shop() > 0 ) {
+        // printf("czekamy na wyjscie wszystkich klientow pozostalo : %d \n",get_customers_in_shop() );
+        sleep(1);
     }
     decrement_cashiers(); // Zmniejszamy liczbę kasjerów
     pthread_exit(NULL);  // Kasjer kończy pracę

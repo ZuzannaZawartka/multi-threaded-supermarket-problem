@@ -8,8 +8,8 @@
 #include "customer.h"
 #include "shared_memory.h"
 
-#define MIN_PEOPLE_FOR_CASHIER 5  // Na każdą grupę 5 klientów przypada jeden kasjer
-#define MAX_CASHIERS 10 
+// #define MIN_PEOPLE_FOR_CASHIER 5  // Na każdą grupę 5 klientów przypada jeden kasjer
+// #define MAX_CASHIERS 10 
 #define MIN_CASHIERS 2
 
 extern SharedMemory* shared_mem;  // Deklaracja pamięci dzielonej
@@ -34,25 +34,10 @@ void send_signal_to_cashiers(int signal) {
 }
 
 void sigTermHandler(int signum) {
-    printf("Menedżer otrzymał sygnał. Czekam na zakończenie pracy kasjerów.\n");
-
-    // Wysyłamy sygnał SIGHUP do kasjerów, aby ci zakończyli swoją pracę po zakończeniu zakupów przez klientów
+    // Wyyłamy sygnał SIGHUP do kasjerów, aby ci zakończyli swoją pracę po zakończeniu zakupów przez klientów
     send_signal_to_cashiers(SIGHUP);
     terminate = 1;  // Ustawiamy flagę końca pracy
-
-    printf("Wszyscy kasjerzy zakończyli pracę. Menedżer kończy działanie.\n");
 }
-
-
-// void* manage_customers(void* arg) {
-//     signal(SIGTERM, sigTermHandler); 
-//     create_initial_cashiers(cashier_threads,cashier_ids);
-//     wait_for_cashiers(cashier_threads,  get_current_cashiers());
-//     cleanAfterCashiers(); 
-//     printf("Menadżer zakończył działanie.\n");
-//     return NULL;
-// }
-
 
 void* manage_customers(void* arg) {
     signal(SIGTERM, sigTermHandler); 
@@ -78,11 +63,13 @@ void* manage_customers(void* arg) {
             create_cashier(&cashier_thread, &cashier_ids[get_current_cashiers()]);
             set_cashier_thread(cashier_threads, get_current_cashiers(), cashier_thread);
             increment_cashiers();
+            increment_active_cashiers(shared_mem);
             printf("X: Dodano nowego kasjera. Liczba aktywnych kasjerów: %d\n", get_current_cashiers());
         }
 
         // Zamykanie nadmiarowych kasjerów
         while (get_current_cashiers() > required_cashiers && get_current_cashiers() > MIN_CASHIERS) {
+            decrement_active_cashiers(shared_mem);//wylaczamy z aktywnych juz ostatniego kasjera
             int cashier_to_remove = get_current_cashiers() - 1; // Indeks kasjera do usunięcia
             pthread_t cashier_thread = get_cashier_thread(cashier_threads, cashier_to_remove); // Uzyskiwanie wątku kasjera
 
@@ -117,6 +104,7 @@ void create_initial_cashiers(pthread_t* cashier_threads, int* cashier_ids) {
         create_cashier(&cashier_thread, cashier_id);  // Tworzymy wątek kasjera
         set_cashier_thread(cashier_threads, i, cashier_thread);  // Ustawiamy wątek kasjera w tablicy (z mutexem)
         increment_cashiers();  // Zwiększamy liczbę kasjerów
+        increment_active_cashiers(shared_mem);
     }
     printf("Utworzono minimalną liczbę kasjerów: %d\n", MIN_CASHIERS);
 }

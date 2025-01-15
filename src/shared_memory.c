@@ -39,11 +39,23 @@ SharedMemory* init_shared_memory() {
         exit(1);
     }
 
+    // Uzyskujemy semafor przed dostępem do pamięci dzielonej
+    if (sem_wait(shared_mem_semaphore) == -1) {
+        perror("Błąd oczekiwania na semafor");
+        exit(1);
+    }
+
     // Inicjalizacja tablicy queue_ids
     for (int i = 0; i < MAX_CASHIERS; i++) {
         shared_mem->queue_ids[i] = -1;  // Wartość -1 oznacza brak kolejki
     }
+    shared_mem->active_cashiers = 0;
 
+      // Zwolnienie semafora po zakończeniu operacji na pamięci dzielonej
+    if (sem_post(shared_mem_semaphore) == -1) {
+        perror("Błąd zwolnienia semafora");
+        exit(1);
+    }
     return shared_mem;
 }
 
@@ -59,7 +71,7 @@ void set_queue_id(SharedMemory* shared_mem, int cashier_id, int queue_id) {
     sem_wait(sem);  // Blokowanie dostępu do pamięci dzielonej
 
     // Sprawdzenie poprawności indeksu
-    if (cashier_id > 0 && cashier_id <= MAX_CASHIERS) {
+    if (cashier_id > 0 && cashier_id <= MAX_CASHIERS) {//poniewz kasjerzy od 1 do 10
         shared_mem->queue_ids[cashier_id-1] = queue_id;
     } else {
         fprintf(stderr, "Błąd: invalid cashier_id: %d\n", cashier_id);
@@ -165,5 +177,86 @@ void cleanup_semaphore() {
         perror("Błąd usuwania semafora");
     } else {
         printf("Semafor został poprawnie usunięty shared memory\n");
+    }
+}
+
+int get_active_cashiers(SharedMemory* shared_mem) {
+    // Uzyskanie semafora
+    sem_t* sem = get_semaphore();
+    if (sem == NULL) {
+        perror("Błąd uzyskiwania semafora");
+        return -1;
+    }
+
+    // Synchronizacja za pomocą semafora
+    if (sem_wait(sem) == -1) {
+        perror("Błąd oczekiwania na semafor");
+        return -1;
+    }
+
+    // Odczytanie liczby kasjerów
+    int active_cashiers = shared_mem->active_cashiers;
+
+    // Zwolnienie semafora
+    if (sem_post(sem) == -1) {
+        perror("Błąd zwolnienia semafora");
+    }
+
+    return active_cashiers;
+}
+
+void increment_active_cashiers(SharedMemory* shared_mem) {
+    // Uzyskanie semafora
+    sem_t* sem = get_semaphore();
+    if (sem == NULL) {
+        perror("Błąd uzyskiwania semafora");
+        return;
+    }
+
+    // Synchronizacja za pomocą semafora
+    if (sem_wait(sem) == -1) {
+        perror("Błąd oczekiwania na semafor");
+        return;
+    }
+
+    // Zwiększenie liczby kasjerów, jeśli nie przekracza maksymalnej liczby
+    if (shared_mem->active_cashiers <= MAX_CASHIERS) {
+        shared_mem->active_cashiers++;
+    } else {
+        fprintf(stderr, "Błąd: liczba kasjerów nie może przekroczyć %d\n", MAX_CASHIERS);
+    }
+       printf("TERAZ MOZNA WYBIERAC KASJEROW OD 0 DO %d\n", shared_mem->active_cashiers);
+    // Zwolnienie semafora
+    if (sem_post(sem) == -1) {
+        perror("Błąd zwolnienia semafora");
+    }
+ 
+}
+
+
+void decrement_active_cashiers(SharedMemory* shared_mem) {
+    // Uzyskanie semafora
+    sem_t* sem = get_semaphore();
+    if (sem == NULL) {
+        perror("Błąd uzyskiwania semafora");
+        return;
+    }
+
+    // Synchronizacja za pomocą semafora
+    if (sem_wait(sem) == -1) {
+        perror("Błąd oczekiwania na semafor");
+        return;
+    }
+
+    // Zmniejszenie liczby kasjerów, jeśli jest większa niż 0
+    if (shared_mem->active_cashiers > 0) {
+        shared_mem->active_cashiers--;
+    } else {
+        fprintf(stderr, "Błąd: liczba kasjerów nie może być mniejsza niż 0\n");
+    }
+    printf("ZMNIEJSZONO : TERAZ MOZNA WYBIERAC KASJEROW OD 0 DO %d\n", shared_mem->active_cashiers);
+    // Zwolnienie semafora
+    if (sem_post(sem) == -1) {
+        perror("Błąd zwolnienia semafora");
     }
 }

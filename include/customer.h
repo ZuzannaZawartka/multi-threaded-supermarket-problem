@@ -29,7 +29,7 @@ void terminate_all_customers();
 //generowanie czasu randomowego z zakresu min - max
 int generate_random_time(int min_time, int max_time);
 
-void handle_customer_signal(int sig);
+void handle_customer_signal(int sig, siginfo_t *info, void *ucontext) ;
 
 
 void init_semaphore_customer();
