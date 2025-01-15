@@ -51,7 +51,7 @@ void* customer_function(void* arg) {
     CustomerData* data = (CustomerData*)arg;  // Odczytanie danych z przekazanej struktury
     pid_t pid = getpid();
     int cashier_id = data->cashier_id;  // Kasjer, do którego klient wysyła komunikat
-    int stay_time = generate_random_time(30,60);
+    int stay_time = generate_random_time(3,8);
 
     printf("Klient %d przybył do sklepu i będzie czekał przez %d sekund. \n", pid, stay_time);
 
@@ -158,7 +158,7 @@ void* create_customer_processes(void* arg) {
             }
     
             
-            get_customers_in_shop(); //ilosc osob po wyjsciu ze sklepu
+            // get_customers_in_shop(); //ilosc osob po wyjsciu ze sklepu
 
             exit(0);
         } else if (pid < 0) {
@@ -173,9 +173,9 @@ void* create_customer_processes(void* arg) {
         // Zapisz PID klienta w process managerze
         add_process(pid);
 
-        get_customers_in_shop();
+        // get_customers_in_shop();
         // Losowy czas na następnego klienta
-        sleep(generate_random_time(0, 1));  // Klient może przyjść w losowych odstępach czasu
+        sleep(generate_random_time(1, 4));  // Klient może przyjść w losowych odstępach czasu
     }
 
     // // Zamykamy semafor po zakończeniu tworzenia procesów

@@ -4,7 +4,7 @@
 #include <pthread.h>
 #include <signal.h>
 
-#define MIN_PEOPLE_FOR_CASHIER 5  // Na każdą grupę 5 klientów przypada jeden kasjer
+#define MIN_PEOPLE_FOR_CASHIER 3  // Na każdą grupę 5 klientów przypada jeden kasjer
 #define MAX_CASHIERS 10 
 #define MIN_CASHIERS 2
 

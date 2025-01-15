@@ -7,6 +7,8 @@
 #include <signal.h>
 #include "customer.h"
 #include "shared_memory.h"
+#include <errno.h>
+ #include <sys/msg.h>  // Dla funkcji msgrcv i msgsnd
 
 // #define MIN_PEOPLE_FOR_CASHIER 5  // Na każdą grupę 5 klientów przypada jeden kasjer
 // #define MAX_CASHIERS 10 
@@ -45,8 +47,9 @@ void* manage_customers(void* arg) {
 
     while (!terminate) {  // Pętla działa dopóki terminate == 0
         int num_customers = get_customers_in_shop();
-        
+     
         int required_cashiers = num_customers / MIN_PEOPLE_FOR_CASHIER;
+        printf("Ilosc klientow to %d , a MIN-POPLE_CASHIER : %d a wymaganych kasjerow %d\n\n",num_customers,MIN_PEOPLE_FOR_CASHIER,required_cashiers);
         if (num_customers % MIN_PEOPLE_FOR_CASHIER != 0) {
             required_cashiers++;
         }
@@ -70,18 +73,31 @@ void* manage_customers(void* arg) {
         // Zamykanie nadmiarowych kasjerów
         while (get_current_cashiers() > required_cashiers && get_current_cashiers() > MIN_CASHIERS) {
             decrement_active_cashiers(shared_mem);//wylaczamy z aktywnych juz ostatniego kasjera
-            int cashier_to_remove = get_current_cashiers() - 1; // Indeks kasjera do usunięcia
-            pthread_t cashier_thread = get_cashier_thread(cashier_threads, cashier_to_remove); // Uzyskiwanie wątku kasjera
+            int cashier_to_remove = get_current_cashiers() ; // Indeks kasjera do usunięcia
+            pthread_t cashier_thread = get_cashier_thread(cashier_threads, cashier_to_remove-1); // Uzyskiwanie wątku kasjera
 
             printf("Zamknięcie kasjera %d - Wątek: %ld\n", cashier_to_remove, cashier_thread);  // Logowanie przed usunięciem kasjera
             pthread_kill(cashier_thread, SIGUSR1 );  // Wysyłanie sygnału do kasjera
 
-            // Usuwanie kolejki kasjera
-            cleanup_queue(cashier_to_remove+1);  
-            printf("Usunięto kolejkę dla kasjera %d\n", cashier_to_remove);  // Logowanie po usunięciu kolejki
+            int queue_id = get_queue_id(shared_mem, cashier_to_remove);
+            // Oczekiwanie na wiadomość od kasjera w pętli
+            
+            Message message;
+            while (msgrcv(queue_id, &message, sizeof(message) - sizeof(long),cashier_to_remove, 0) == -1) {
+                if (errno == EINTR) {
+                    continue; // Ignorujemy sygnały i kontynuujemy oczekiwanie
+                } else {
+                    perror("Błąd odbierania wiadomości od kasjera");
+                    exit(1);
+                }
+            }
+
+            cleanup_queue(message.mtype);
+
+            printf("Usunięto kolejkę dla kasjera %ld\n", message.mtype);  // Logowanie po usunięciu kolejki
 
             decrement_cashiers();
-            printf("Y: Zamknięto kasjera %d. Liczba aktywnych kasjerów: %d\n", cashier_to_remove, get_current_cashiers());
+            printf("Y: Zamknięto kasjera %ld. Liczba aktywnych kasjerów: %d\n", message.mtype, get_current_cashiers());
         }
 
         sleep(1);  // Sprawdzanie stanu co sekundę

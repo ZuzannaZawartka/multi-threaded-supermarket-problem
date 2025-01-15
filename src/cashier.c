@@ -11,13 +11,27 @@
 #include "manager_cashiers.h"
 #include "customer.h"
 
-// Tablica przechowująca identyfikatory kolejek dla kasjerów (max 10)
 extern SharedMemory* shared_mem; // Deklaracja pamięci dzielonej
 extern pthread_mutex_t mutex;
 extern int current_cashiers;
 
+pthread_key_t cashier_thread_key;
+
+void init_cashier_thread_key() {
+    if (pthread_key_create(&cashier_thread_key, NULL) != 0) {
+        perror("Błąd tworzenia klucza dla wątku kasjera");
+        exit(1);
+    }
+}
 
 void create_cashier(pthread_t* cashier_thread, int* cashier_id) {
+
+    static int initialized = 0;
+    if (!initialized) {
+        init_cashier_thread_key(); // Inicjalizuj klucz wątku kasjera
+        initialized = 1;
+    }
+
     // Tworzenie kolejki komunikatu dla kasjera
     int queue_id = msgget(IPC_PRIVATE, 0666 | IPC_CREAT);
     if (queue_id == -1) {
@@ -27,6 +41,13 @@ void create_cashier(pthread_t* cashier_thread, int* cashier_id) {
 
     // Zapisanie identyfikatora kolejki w pamięci dzielonej
     set_queue_id(shared_mem, *cashier_id , queue_id);
+
+
+    // Przypisanie ID kasjera do wątku
+    if (pthread_setspecific(cashier_thread_key, cashier_id) != 0) {
+        perror("Błąd przypisania ID kasjera do wątku");
+        exit(1);
+    }
 
     // Tworzenie wątku kasjera
     if (pthread_create(cashier_thread, NULL, cashier_function, cashier_id) != 0) {
@@ -40,6 +61,12 @@ void create_cashier(pthread_t* cashier_thread, int* cashier_id) {
 
 void* cashier_function(void* arg) {
     int cashier_id = *((int*)arg); 
+
+    // Przypisanie ID kasjera do wątku
+    if (pthread_setspecific(cashier_thread_key, &cashier_id) != 0) {
+        perror("Błąd przypisania ID kasjera do wątku");
+        exit(1);
+    }
 
     // Rejestracja handlera sygnału SIGUSR1
     signal(SIGHUP, handle_cashier_signal);
@@ -83,15 +110,19 @@ void* cashier_function(void* arg) {
 }
 
 void sigUsr2Handler(int signum) {
-    printf("ZAMYKANIE KASY NR : %d  - Zakończę obsługę wszystkich klientów w kolejce.\n", get_current_cashiers());
+
+    int cashier_id = *((int*)pthread_getspecific(cashier_thread_key));
+
 
     // Pobranie identyfikatora kolejki kasjera
-    int queue_id = get_queue_id(shared_mem, get_current_cashiers());
+    int queue_id = get_queue_id(shared_mem, cashier_id);
+
+    printf("ZAMYKANIE KASY NR : %d  - Zakończę obsługę wszystkich klientów w kolejce.\n", cashier_id);
 
     Message message;
 
     // Obsługuje wszystkich klientów w kolejce
-    while (msgrcv(queue_id, &message, sizeof(message) - sizeof(long), get_current_cashiers(), IPC_NOWAIT) != -1) {
+    while (msgrcv(queue_id, &message, sizeof(message) - sizeof(long),cashier_id, IPC_NOWAIT) != -1) {
         printf("Kasjer obsługujący klienta o PID = %d.\n", message.customer_pid);
         sleep(1);  // Symulacja obsługi
 
@@ -103,8 +134,14 @@ void sigUsr2Handler(int signum) {
         }
     }
 
+    message.mtype = cashier_id;  // Typ wiadomości to ID kasjera
+    if (msgsnd(queue_id, &message, sizeof(message) - sizeof(long), 0) == -1) {
+        perror("Błąd wysyłania komunikatu do menadżera");
+        exit(1);
+    }
+
     // Po zakończeniu obsługi wszystkich klientów kasjer kończy pracę
-    printf("Kasjer zakończył obsługę wszystkich klientów.\n");
+    printf("ZAKONCZONO OBSLUGE KLIENTOW, Kasjer zakończył obsługę wszystkich klientów.\n");
     pthread_exit(NULL);
 }
 
@@ -148,7 +185,7 @@ void cleanup_queue(int cashier_id) {
     if (msgctl(queue_id, IPC_RMID, NULL) == -1) {
         perror("Błąd usuwania kolejki komunikatów");
     } else {
-        printf("Kolejka komunikatów dla kasjera %d została usunięta.\n", cashier_id-1);
+        printf("Kolejka komunikatów dla kasjera %d została usunięta.\n", cashier_id);
 
         // Zaktualizowanie pamięci dzielonej: ustawienie kolejki na -1
         set_queue_id(shared_mem, cashier_id, -1);
