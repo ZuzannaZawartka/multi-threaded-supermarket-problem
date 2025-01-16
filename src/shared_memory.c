@@ -225,7 +225,7 @@ void increment_active_cashiers(SharedMemory* shared_mem) {
     } else {
         fprintf(stderr, "Błąd: liczba kasjerów nie może przekroczyć %d\n", MAX_CASHIERS);
     }
-       printf("TERAZ MOZNA WYBIERAC KASJEROW OD 0 DO %d\n", shared_mem->active_cashiers);
+       printf("Kasjerzy dostepni z zakresu 0 - %d\n", shared_mem->active_cashiers);
     // Zwolnienie semafora
     if (sem_post(sem) == -1) {
         perror("Błąd zwolnienia semafora");
@@ -254,7 +254,7 @@ void decrement_active_cashiers(SharedMemory* shared_mem) {
     } else {
         fprintf(stderr, "Błąd: liczba kasjerów nie może być mniejsza niż 0\n");
     }
-    printf("ZMNIEJSZONO : TERAZ MOZNA WYBIERAC KASJEROW OD 0 DO %d\n", shared_mem->active_cashiers);
+
     // Zwolnienie semafora
     if (sem_post(sem) == -1) {
         perror("Błąd zwolnienia semafora");

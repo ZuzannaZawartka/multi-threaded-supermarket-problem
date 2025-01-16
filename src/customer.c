@@ -51,7 +51,7 @@ void* customer_function(void* arg) {
     CustomerData* data = (CustomerData*)arg;  // Odczytanie danych z przekazanej struktury
     pid_t pid = getpid();
     int cashier_id = data->cashier_id;  // Kasjer, do którego klient wysyła komunikat
-    int stay_time = generate_random_time(3,8);
+    int stay_time = generate_random_time(5,10);
 
     printf("Klient %d przybył do sklepu i będzie czekał przez %d sekund. \n", pid, stay_time);
 
@@ -61,6 +61,8 @@ void* customer_function(void* arg) {
         // Jeśli flaga nie jest ustawiona, klient dalej chodzi po sklepie
         sleep(1);  // Przerwa, aby dać innym procesom czas na działanie
     }
+
+    cashier_id = get_active_cashiers(shared_mem);
 
     Message message;
     message.mtype = cashier_id;
@@ -82,13 +84,12 @@ void* customer_function(void* arg) {
                 sleep(1);
                 continue;
             } else {
-                perror("Błąd odbierania komunikatu klient");
+                printf("Blad odbierania komunikatu od kasjera %d",cashier_id);
+                perror("Błąd odbierania komunikatu klient od kasjera");
                 exit(1);
             }
         }
-
-        // Jeśli otrzymaliśmy odpowiedź, klient kończy czekanie
-        printf("Klient %d otrzymał odpowiedź od kasjera i opuszcza sklep.\n", pid);
+        // printf("Kasjer %d obsłużył klienta %d otrzymał i opuszcza sklep.\n",pid,cashier_id);
         break;
     }
     
@@ -100,6 +101,7 @@ void* customer_function(void* arg) {
 
 void handle_customer_signal(int sig, siginfo_t *info, void *ucontext) {
 
+    printf("dostalem sygnal klient: %d",getpid());
     if (safe_sem_post() == -1) {  // Zabezpieczona funkcja sem_post
             exit(1);  // W przypadku błędu, kończymy proces
     }
@@ -134,9 +136,9 @@ void* create_customer_processes(void* arg) {
 
         printf("Aktualna liczba osób w sklepie:  %d/100\n", get_customers_in_shop());
 
-        // Losowy wybór kasjera dla klienta
-        int customer_cashier_id = rand() % get_active_cashiers(shared_mem) + 1; 
-
+        // Losowy wybór kasjera dla klienta z zakresu od 1 do active users
+        // int customer_cashier_id = rand() % get_active_cashiers(shared_mem) + 1; 
+        int customer_cashier_id = get_active_cashiers(shared_mem);
         pid_t pid = fork();  // Tworzenie nowego procesu klienta
 
         if (pid == 0) {
@@ -175,7 +177,7 @@ void* create_customer_processes(void* arg) {
 
         // get_customers_in_shop();
         // Losowy czas na następnego klienta
-        sleep(generate_random_time(1, 4));  // Klient może przyjść w losowych odstępach czasu
+        sleep(generate_random_time(1, 3));  // Klient może przyjść w losowych odstępach czasu
     }
 
     // // Zamykamy semafor po zakończeniu tworzenia procesów

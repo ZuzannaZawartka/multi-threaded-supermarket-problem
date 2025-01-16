@@ -14,8 +14,10 @@
 extern SharedMemory* shared_mem; // Deklaracja pamięci dzielonej
 extern pthread_mutex_t mutex;
 extern int current_cashiers;
-
+extern pthread_cond_t cashier_closed_cond ;
 pthread_key_t cashier_thread_key;
+
+volatile int terminate_flags[MAX_CASHIERS] = {0}; 
 
 void init_cashier_thread_key() {
     if (pthread_key_create(&cashier_thread_key, NULL) != 0) {
@@ -81,19 +83,51 @@ void* cashier_function(void* arg) {
     while (1) {
         // Próba odebrania wiadomości z kolejki
         if (msgrcv(queue_id, &message, sizeof(message) - sizeof(long), cashier_id, IPC_NOWAIT) == -1) {
-            if (errno == ENOMSG) {
+           if (errno == ENOMSG) {
+                // Sprawdzenie flagi końca pracy
+                 pthread_mutex_lock(&mutex);
+                int terminate_flag = terminate_flags[cashier_id - 1];
+                pthread_mutex_unlock(&mutex);
+
+                if (terminate_flag == 1) { //jesli zakonczenie pracy a juz nie ma wiadomosci to mozemy usuwac kasjera
+                    struct msqid_ds queue_info;
+
+                    // Sprawdzamy, czy kolejka jest pusta
+                    if (msgctl(queue_id, IPC_STAT, &queue_info) == -1) {
+                        perror("Błąd pobierania informacji o kolejce");
+                        exit(1);
+                    }
+
+                    if (queue_info.msg_qnum == 0) {
+                        // Czyszczenie kolejki
+                       
+                        cleanup_queue(cashier_id);
+
+                        // Sygnalizujemy zakończenie pracy kasjera
+                        pthread_mutex_lock(&mutex);
+                        pthread_cond_signal(&cashier_closed_cond);
+                        pthread_mutex_unlock(&mutex);
+
+                        // wyzerowanie flagi
+                        pthread_mutex_lock(&mutex);
+                        terminate_flags[cashier_id-1]=0;
+                        pthread_mutex_unlock(&mutex);
+
+                        printf("KASJER %d obsłużył wszystkich\n\n", cashier_id);
+                        pthread_exit(NULL);
+                    }
+                }
+
                 sleep(1);  // Jeśli nie ma wiadomości, kasjer czeka
                 continue;
-            }
+           }
             perror("Błąd odbierania komunikatu kasjer");
             exit(1);
         }
 
         printf("Kasjer %d obsługuje klienta o PID = %d\n", cashier_id, message.customer_pid);
 
-        sleep(4);
-
-        
+       
         // Wysłanie odpowiedzi do klienta
         message.mtype = message.customer_pid;
         if (msgsnd(queue_id, &message, sizeof(message) - sizeof(long), 0) == -1) {
@@ -101,58 +135,92 @@ void* cashier_function(void* arg) {
             exit(1);
         }
 
-        printf("Kasjer %d zakończył obsługę klienta o PID = %d\n", cashier_id, message.customer_pid);
+        sleep(4);
+
+        printf("Kasjer %d zakończył obsługę klienta o PID = %d, klient wychodzi \n", cashier_id, message.customer_pid);
     }
 
-    cleanup_queue(cashier_id);  // Czyszczenie kolejki kasjera
-    decrement_cashiers();
-    pthread_exit(NULL);
+    // cleanup_queue(cashier_id);  // Czyszczenie kolejki kasjera
+    // decrement_cashiers();
+    // pthread_exit(NULL);
 }
+
 
 void sigUsr2Handler(int signum) {
-
     int cashier_id = *((int*)pthread_getspecific(cashier_thread_key));
-
-
-    // Pobranie identyfikatora kolejki kasjera
-    int queue_id = get_queue_id(shared_mem, cashier_id);
-
-    printf("ZAMYKANIE KASY NR : %d  - Zakończę obsługę wszystkich klientów w kolejce.\n", cashier_id);
-
-    Message message;
-
-    // Obsługuje wszystkich klientów w kolejce
-    while (msgrcv(queue_id, &message, sizeof(message) - sizeof(long),cashier_id, IPC_NOWAIT) != -1) {
-        printf("Kasjer obsługujący klienta o PID = %d.\n", message.customer_pid);
-        sleep(1);  // Symulacja obsługi
-
-        // Wysłanie komunikatu o zakończeniu obsługi do klienta
-        message.mtype = message.customer_pid;
-        if (msgsnd(queue_id, &message, sizeof(message) - sizeof(long), 0) == -1) {
-            perror("Błąd wysyłania komunikatu do klienta");
-            exit(1);
-        }
-    }
-
-    message.mtype = cashier_id;  // Typ wiadomości to ID kasjera
-    if (msgsnd(queue_id, &message, sizeof(message) - sizeof(long), 0) == -1) {
-        perror("Błąd wysyłania komunikatu do menadżera");
-        exit(1);
-    }
-
-    // Po zakończeniu obsługi wszystkich klientów kasjer kończy pracę
-    printf("ZAKONCZONO OBSLUGE KLIENTOW, Kasjer zakończył obsługę wszystkich klientów.\n");
-    pthread_exit(NULL);
+    printf("Kasjer %d otrzymał sygnał do zakończenia pracy.\n", cashier_id);
+    pthread_mutex_lock(&mutex);
+    terminate_flags[cashier_id-1]=1;
+    pthread_mutex_unlock(&mutex);
 }
+
+
+// void sigUsr2Handler(int signum) {
+
+//     int cashier_id = *((int*)pthread_getspecific(cashier_thread_key)); //potrzebne ponieważ cashier id sie zmieniaja a skoro jest sygnal do tego konktetnego to ma być ono usuniete
+
+
+//     // Pobranie identyfikatora kolejki kasjera
+//     int queue_id = get_queue_id(shared_mem, cashier_id);
+
+//     printf("ZAMYKANIE KASY NR : %d  - Zakończę obsługę wszystkich klientów w kolejce.\n", cashier_id);
+
+//     Message message;
+
+//     // Obsługuje wszystkich klientów w kolejce
+//     while (msgrcv(queue_id, &message, sizeof(message) - sizeof(long),cashier_id, IPC_NOWAIT) != -1) {
+//         printf("Kasjer obsługujący klienta o PID = %d.\n", message.customer_pid);
+        
+//         // Wysłanie komunikatu o zakończeniu obsługi do klienta
+//         message.mtype = message.customer_pid;
+//         if (msgsnd(queue_id, &message, sizeof(message) - sizeof(long), 0) == -1) {
+//             perror("Błąd wysyłania komunikatu do klienta");
+//             exit(1);
+//         }
+
+//         sleep(3);  // Symulacja obsługi
+
+
+//         printf("Kasjer %d zakończył obsługę klienta o PID = %d, klient wychodzi \n", cashier_id, message.customer_pid);
+//     }
+
+//     // Oczekiwanie aż kolejka będzie naprawdę pusta
+//     struct msqid_ds queue_info;
+//     do {
+//         if (msgctl(queue_id, IPC_STAT, &queue_info) == -1) {
+//             perror("Błąd pobierania informacji o kolejce");
+//             exit(1);
+//         }
+
+//         if (queue_info.msg_qnum > 0) {
+//             printf("Kolejka kasjera %d nadal zawiera %lu komunikatów, czekam...\n", cashier_id, queue_info.msg_qnum);
+//             sleep(1);  // Odczekaj chwilę przed ponownym sprawdzeniem
+//         }
+//     } while (queue_info.msg_qnum > 0);
+
+//     printf("Kolejka kasjera %d jest pusta. Można bezpiecznie zamknąć kasę.\n", cashier_id);
+
+//     pthread_mutex_lock(&mutex);
+//     pthread_cond_signal(&cashier_closed_cond);
+//     pthread_mutex_unlock(&mutex);
+
+//     // Po zakończeniu obsługi wszystkich klientów kasjer kończy pracę
+//     printf("ZAKONCZONO OBSLUGE KLIENTOW, Kasjer zakończył obsługę wszystkich klientów.\n");
+//     cleanup_queue(cashier_id);
+//     pthread_exit(NULL);
+// }
 
 
 void handle_cashier_signal(int sig) {
+     int cashier_id = *((int*)pthread_getspecific(cashier_thread_key));
+    printf("MAM SYGNAL  kasjer:%d:)\n",cashier_id);
 
     while (get_customers_in_shop() > 0 ) {
-        // printf("czekamy na wyjscie wszystkich klientow pozostalo : %d \n",get_customers_in_shop() );
+        printf("czekamy na wyjscie wszystkich klientow pozostalo : %d \n",get_customers_in_shop() );
         sleep(1);
     }
     decrement_cashiers(); // Zmniejszamy liczbę kasjerów
+    printf("KASJER WYSZEDL %d\n",cashier_id);
     pthread_exit(NULL);  // Kasjer kończy pracę
 }
 
