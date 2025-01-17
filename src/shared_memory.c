@@ -17,10 +17,8 @@ SharedMemory* init_shared_memory() {
     if (shm_id == -1) {
         perror("Błąd tworzenia pamięci dzielonej");
         exit(1);
-    }else{
-        printf("utworozno");
     }
-
+    
     // Przyłączenie do pamięci dzielonej
     SharedMemory* shared_mem = (SharedMemory*)shmat(shm_id, NULL, 0);
     if (shared_mem == (void*)-1) {

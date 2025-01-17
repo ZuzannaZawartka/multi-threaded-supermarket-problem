@@ -63,11 +63,11 @@ int main() {
 
     signal(SIGINT, mainHandlerProcess);// Rejestracja handlera SIGINT
     shared_mem = init_shared_memory();
-    // Tworzenie wątku dla managera kasjerow
-    init_manager(&monitor_thread);
 
-    // Tworzenie wątku dla klientów
-    if (pthread_create(&customer_thread, NULL, create_customer_processes, NULL) != 0) {
+    init_manager(&monitor_thread);  // Tworzenie wątku dla managera kasjerow
+
+
+    if (pthread_create(&customer_thread, NULL, create_customer_processes, NULL) != 0) { // Tworzenie wątku dla klientów
         perror("Błąd tworzenia wątku dla klientów");
         exit(1);
     }
@@ -81,12 +81,12 @@ int main() {
 
     pthread_join(firefighter_thread, NULL); //czekanie na firefightera
 
-        //Czyszczenie pamięci dzielonej
+    //Czyszczenie pamięci dzielonej
     cleanup_shared_memory(shared_mem);
 
     destroy_semaphore_customer();
 
-    printf("KONIEC");
+    printf("KONIEC\n");
     return 0;
 }
 

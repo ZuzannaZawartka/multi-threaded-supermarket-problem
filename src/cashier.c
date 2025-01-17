@@ -172,9 +172,7 @@ void wait_for_cashiers(pthread_t* cashier_threads, int num_cashiers) {
             int ret = pthread_join(cashier_thread, &status);  // Czeka na zakończenie wątku
             if (ret == 0) {
                 printf("Wątek kasjera %d zakończył się z kodem: %ld, ttid: %lu\n", i+1, (long)status, cashier_thread);
-            } else {
-                printf("Błąd podczas oczekiwania na zakończenie wątku kasjera %d\n", i+1);
-            }
+             } 
         }
     }
 }

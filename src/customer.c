@@ -48,9 +48,9 @@ void* customer_function(void* arg) {
     CustomerData* data = (CustomerData*)arg;  // Odczytanie danych z przekazanej struktury
     pid_t pid = getpid();
     int cashier_id = data->cashier_id;  // Kasjer, do którego klient wysyła komunikat
-    int stay_time = generate_random_time(1,3);
+    int stay_time = generate_random_time(8,15);
 
-    printf("\tKlient %d przybył do sklepu i będzie czekał przez %d sekund. [%d/100] \n", pid, stay_time,get_customers_in_shop());
+    printf("\t\033[32mKlient %d przybył do sklepu\033[0m i będzie czekał przez %d sekund. [%d/100] \n", pid, stay_time, get_customers_in_shop());
 
     // Cykliczne sprawdzanie flagi, czy pożar jest aktywny
     time_t start_time = time(NULL);  // Czas rozpoczęcia chodzenia klienta po sklepie
@@ -73,7 +73,7 @@ void* customer_function(void* arg) {
         exit(1);
     }
 
-    printf("\t\tKlient %d wysłał komunikat do kasy %d. Czeka na obsługę.\n", pid, cashier_id);
+    printf("\t\tKlient %d ( wysłał komunikat do kasy %d. ) Czeka na obsługę.\n", pid, cashier_id);
 
     while (1) {
         if (msgrcv(queue_id, &message, sizeof(message) - sizeof(long), pid, IPC_NOWAIT) == -1) {
@@ -86,7 +86,7 @@ void* customer_function(void* arg) {
                 exit(1);
             }
         }
-        printf("\tKasjer %d obsłużył klienta %d otrzymał i opuszcza sklep.\n",cashier_id,pid);
+        printf("\t\t\t \033[31mKlient %d opuszcza\033[0m sklep, został obsłużony przez kasjer %d \n", pid, cashier_id);
         break;
     }
     
@@ -172,7 +172,7 @@ void* create_customer_processes(void* arg) {
 
         // get_customers_in_shop();
         // Losowy czas na następnego klienta
-        sleep(generate_random_time(1, 3));  // Klient może przyjść w losowych odstępach czasu
+        sleep(generate_random_time(0, 1));  // Klient może przyjść w losowych odstępach czasu
     }
 
     // // Zamykamy semafor po zakończeniu tworzenia procesów
@@ -194,8 +194,8 @@ void wait_for_customers() {
 
             // printf("Proces klienta %d zakończony, zwiększam semafor. Miejsca w sklepie zostały zwolnione.\n", finished_pid);
         } else if (finished_pid == 0) {
-            // Jeśli nie ma zakończonych procesów, po prostu czekamy
-            sleep(1);  // Czekaj, jeśli brak zakończonych procesów
+
+            sleep(1);  // Jeśli nie ma zakończonych procesów, po prostu czekamy
         } else {
             // Obsługujemy błąd (np. brak procesów do oczekiwania)
             if (errno != ECHILD) {
@@ -206,8 +206,7 @@ void wait_for_customers() {
 
         // Sprawdzamy, czy lista procesów jest pusta i czy flaga zakończenia pracy jest ustawiona
         if (process_list == NULL && terminate_customers == 1) {
-            // Po zakończeniu pracy, czyszczymy wszystkie procesy
-            cleanup_processes();  // Czyszczenie procesów
+            cleanup_processes(); // Po zakończeniu pracy, czyszczymy wszystkie procesy
             break;  // Kończymy pętlę, ponieważ procesy zakończone i flaga zakończenia pracy jest ustawiona
         }
     }

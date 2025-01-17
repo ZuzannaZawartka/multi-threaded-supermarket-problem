@@ -64,7 +64,7 @@ void* manage_customers(void* arg) {
             set_cashier_thread(cashier_threads, get_current_cashiers(), cashier_thread);
             increment_cashiers();
             increment_active_cashiers(shared_mem);
-            printf("\033[32m[KASJER %d] OTWIERANIE, Obecny zakres kasjerów : 1 - %d\033[0m\n\n", get_current_cashiers(), get_active_cashiers(shared_mem));
+            printf("\033[1;32m[KASJER %d] OTWIERANIE, Obecny zakres kasjerów : 1 - %d\033[0m\n\n", get_current_cashiers(), get_active_cashiers(shared_mem));
         }
 
         // Zamykanie nadmiarowych kasjerów
@@ -73,7 +73,7 @@ void* manage_customers(void* arg) {
             int cashier_to_remove = get_current_cashiers() ; // Indeks kasjera do usunięcia
             pthread_t cashier_thread = get_cashier_thread(cashier_threads, cashier_to_remove-1); // Uzyskiwanie wątku kasjera
 
-            printf("\033[31mY: [KASJER %d] już nie przyjmuje więcej klientów - Wątek: %ld\033[0m\n", cashier_to_remove, cashier_thread); // Logowanie przed usunięciem kasjera
+            printf("\033[38;5;196m [KASJER %d] już nie przyjmuje więcej klientów - Wątek: %ld\033[0m\n", cashier_to_remove, cashier_thread); // Logowanie przed usunięciem kasjera
 
              // Wysyłamy sygnał do kasjera
             if (pthread_kill(cashier_thread, SIGUSR1) != 0) {
@@ -85,7 +85,7 @@ void* manage_customers(void* arg) {
             void* status = NULL;
             int ret = pthread_join(cashier_thread, &status);
             if (ret == 0) {
-                printf("\033[31m[KAJSER %d] kasa już zakończyła pracę , kod zakończenia: %ld\033[0m\n", cashier_to_remove, (long)status);
+                printf("\033[38;5;196m[KAJSER %d] kasa już zakończyła pracę , kod zakończenia: %ld\033[0m\n", cashier_to_remove, (long)status);
             } else {
                 perror("Błąd podczas oczekiwania na zakończenie wątku kasjera");
             }

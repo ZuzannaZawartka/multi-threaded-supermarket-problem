@@ -6,6 +6,7 @@
 ProcessNode* process_list = NULL;  
 
 
+
 void add_process(pid_t pid) {
 
     if (process_exists(pid)) {

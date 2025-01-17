@@ -5,9 +5,11 @@
 #include <pthread.h>
 
 
+const char* orange = "\033[38;5;214m"; // ANSI escape code for orange
+const char* reset = "\033[0m";  // Reset kolorów
+
 // Handler sygnału SIGINT dla strażaka
 void firefighter_sigint_handler(int signum) {
-    // printf("Strażak otrzymał sygnał SIGINT! Kończę działanie...\n");
     pthread_exit(NULL); // Bezpośrednie zakończenie wątku
 }
 
@@ -15,7 +17,7 @@ void firefighter_sigint_handler(int signum) {
 // Funkcja odliczania od 5 do 0
 void countdown_to_exit() {
     for (int i = 5; i > 0; i--) {
-        printf("Pożar trwa! [%d]\n", i);
+        printf("%sPożar trwa! [%d]%s\n", orange, i, reset);
         sleep(1);  // Czeka 1 sekundę
     }
 }
