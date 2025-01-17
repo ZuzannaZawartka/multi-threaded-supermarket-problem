@@ -16,7 +16,7 @@
 #include <semaphore.h>
 #include <fcntl.h>  // Dla O_CREAT, O_EXCL
 #include <sys/stat.h>  // Dla S_IRUSR, S_IWUSR
-// #include "manager_cashiers.h"
+
 #define MIN_CASHIERS 2
 
 #define SEMAPHORE_NAME "/customer_semaphore"
@@ -24,7 +24,6 @@
 
 extern SharedMemory* shared_mem;  // Dostęp do pamięci dzielonej
 sem_t customer_semaphore; 
-
 volatile int terminate_customers = 0;
 
 
@@ -40,8 +39,6 @@ void setup_signal_handler_for_customers() {
 
 }
 
-
-
 void* customer_function(void* arg) {
 
     setup_signal_handler_for_customers();
@@ -51,9 +48,9 @@ void* customer_function(void* arg) {
     CustomerData* data = (CustomerData*)arg;  // Odczytanie danych z przekazanej struktury
     pid_t pid = getpid();
     int cashier_id = data->cashier_id;  // Kasjer, do którego klient wysyła komunikat
-    int stay_time = generate_random_time(5,10);
+    int stay_time = generate_random_time(1,3);
 
-    printf("Klient %d przybył do sklepu i będzie czekał przez %d sekund. \n", pid, stay_time);
+    printf("\tKlient %d przybył do sklepu i będzie czekał przez %d sekund. [%d/100] \n", pid, stay_time,get_customers_in_shop());
 
     // Cykliczne sprawdzanie flagi, czy pożar jest aktywny
     time_t start_time = time(NULL);  // Czas rozpoczęcia chodzenia klienta po sklepie
@@ -76,7 +73,7 @@ void* customer_function(void* arg) {
         exit(1);
     }
 
-    printf("Klient %d wysłał komunikat do kasy %d. Czeka na obsługę.\n", pid, cashier_id);
+    printf("\t\tKlient %d wysłał komunikat do kasy %d. Czeka na obsługę.\n", pid, cashier_id);
 
     while (1) {
         if (msgrcv(queue_id, &message, sizeof(message) - sizeof(long), pid, IPC_NOWAIT) == -1) {
@@ -89,7 +86,7 @@ void* customer_function(void* arg) {
                 exit(1);
             }
         }
-        // printf("Kasjer %d obsłużył klienta %d otrzymał i opuszcza sklep.\n",pid,cashier_id);
+        printf("\tKasjer %d obsłużył klienta %d otrzymał i opuszcza sklep.\n",cashier_id,pid);
         break;
     }
     
@@ -100,14 +97,14 @@ void* customer_function(void* arg) {
 
 
 void handle_customer_signal(int sig, siginfo_t *info, void *ucontext) {
+    // Klient czeka przez 5 sekund przed wyjściem
+    sleep(5);
 
-    printf("dostalem sygnal klient: %d",getpid());
     if (safe_sem_post() == -1) {  // Zabezpieczona funkcja sem_post
             exit(1);  // W przypadku błędu, kończymy proces
     }
 
     printf("Klient %d: Opuszczam sklep.\n", getpid());
-    // remove_process(getpid());
     exit(0);
 }
 
@@ -133,8 +130,6 @@ void* create_customer_processes(void* arg) {
         if (safe_sem_wait() == -1) {  // Zabezpieczona funkcja sem_wait
             exit(1);  // W przypadku błędu, kończymy proces
         }
-
-        printf("Aktualna liczba osób w sklepie:  %d/100\n", get_customers_in_shop());
 
         // Losowy wybór kasjera dla klienta z zakresu od 1 do active users
         // int customer_cashier_id = rand() % get_active_cashiers(shared_mem) + 1; 
@@ -237,8 +232,6 @@ void init_semaphore_customer() {
             perror("Błąd inicjalizacji semafora");
             exit(1);
         }
-    } else {
-        printf("Semafor został zainicjalizowany z wartością 100.\n");
     }
 }
 
@@ -320,23 +313,6 @@ int safe_sem_post() {
 
     return 0;  // Operacja zakończona sukcesem
 }
-
-
-
-
-// int safe_sem_post() {
-//     sem_t* semaphore = get_semaphore_customer();  // Pobieramy semafor bezpośrednio wewnątrz funkcji
-
-//     int result = sem_post(semaphore);  // Podnosimy semafor
-//     if (result == -1) {
-//         perror("Błąd podczas podnoszenia semafora");
-//         return -1;  // Zwracamy -1 w przypadku błędu
-//     }
-//     printf("WYJSCIE KLIENTA %d",getpid());
-//     return 0;  // Zwracamy 0, jeśli operacja zakończyła się sukcesem
-// }
-
-
 
 
 

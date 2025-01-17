@@ -8,7 +8,7 @@
 #include "shared_memory.h"
 #include <fcntl.h>
 
-#define SHM_KEY 12345  // Klucz do pamięci dzielonej
+#define SHM_KEY 12387  // Klucz do pamięci dzielonej
 #define SEM_NAME "/shared_mem_semaphore" 
 // Inicjalizowanie pamięci dzielonej z semaforem POSIX
 SharedMemory* init_shared_memory() {
@@ -17,6 +17,8 @@ SharedMemory* init_shared_memory() {
     if (shm_id == -1) {
         perror("Błąd tworzenia pamięci dzielonej");
         exit(1);
+    }else{
+        printf("utworozno");
     }
 
     // Przyłączenie do pamięci dzielonej
@@ -133,6 +135,7 @@ void cleanup_shared_memory(SharedMemory* shared_mem) {
         perror("Błąd odłączania pamięci dzielonej");
     }
 
+
     // Usunięcie segmentu pamięci dzielonej
     int shm_id = shmget(SHM_KEY, sizeof(SharedMemory), 0666);
     if (shm_id != -1) {
@@ -142,6 +145,8 @@ void cleanup_shared_memory(SharedMemory* shared_mem) {
             printf("Pamięć dzielona została poprawnie usunięta\n");
         }
     }
+
+
 
     sem_post(sem);  // Zwolnienie semafora
     // Czyszczenie semafora
@@ -225,7 +230,7 @@ void increment_active_cashiers(SharedMemory* shared_mem) {
     } else {
         fprintf(stderr, "Błąd: liczba kasjerów nie może przekroczyć %d\n", MAX_CASHIERS);
     }
-       printf("Kasjerzy dostepni z zakresu 0 - %d\n", shared_mem->active_cashiers);
+ 
     // Zwolnienie semafora
     if (sem_post(sem) == -1) {
         perror("Błąd zwolnienia semafora");

@@ -71,5 +71,4 @@ void cleanup_processes() {
     }
 
     process_list = NULL;  
-    printf("Lista procesów została oczyszczona.\n");
 }

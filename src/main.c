@@ -9,6 +9,7 @@
 #include "customer.h"
 #include "shared_memory.h"
 #include "manager_cashiers.h"
+#include "firefighter.h"
 
 #include <sys/sem.h>  // Do operacji na semaforach systemowych
 #include <sys/ipc.h> 
@@ -23,6 +24,7 @@ int NUM_CUSTOMERS  = 5 ;// Liczba klientów (tymczasowo)
 SharedMemory* shared_mem;
 pthread_t monitor_thread;  // Declare it as a global variable
 pthread_t customer_thread;
+pthread_t firefighter_thread; // Wątek strażaka
 
 void send_signal_to_manager(int signal) {
     if (pthread_kill(monitor_thread, signal) != 0) {
@@ -36,10 +38,25 @@ void send_signal_to_customers(int signal) {
     }
 }
 
+// Funkcja wysyłająca sygnał do strażaka
+void send_signal_to_firefighter(int signal) {
+    if (pthread_kill(firefighter_thread, signal) != 0) {
+        // perror("Błąd wysyłania sygnału do strażaka"); //tutaj blad wyrzuci gdy strazak sam sie wywola
+    }
+}
+
 void mainHandlerProcess(int signum) {
     send_signal_to_manager(SIGTERM);  // Wysyłanie sygnału do wątku menedżera
     send_signal_to_customers(SIGUSR2);  // Wysyłanie sygnału do wątku menedżera
+    send_signal_to_firefighter(SIGQUIT);
+    countdown_to_exit();
 }
+
+void set_process_group() {
+    pid_t pid = getpid();
+    setpgid(pid, pid);  // Ustawienie głównego procesu jako lidera grupy procesów
+}
+
 
 int main() {
     srand(time(NULL));  
@@ -55,12 +72,16 @@ int main() {
         exit(1);
     }
 
+    init_firefighter(&firefighter_thread);
+
     // Czekanie na zakończenie procesów klientów
     wait_for_customers();
 
     terminate_manager(monitor_thread);
 
-    //Czyszczenie pamięci dzielonej
+    pthread_join(firefighter_thread, NULL); //czekanie na firefightera
+
+        //Czyszczenie pamięci dzielonej
     cleanup_shared_memory(shared_mem);
 
     destroy_semaphore_customer();
