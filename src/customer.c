@@ -39,16 +39,14 @@ void setup_signal_handler_for_customers() {
 
 }
 
-void* customer_function(void* arg) {
+void* customer_function() {
 
     setup_signal_handler_for_customers();
 
     // signal(SIGINT, handle_customer_signal); // handler na sygnał i wyjściu
 
-    CustomerData* data = (CustomerData*)arg;  // Odczytanie danych z przekazanej struktury
     pid_t pid = getpid();
-    int cashier_id = data->cashier_id;  // Kasjer, do którego klient wysyła komunikat
-    int stay_time = generate_random_time(8,15);
+    int stay_time = generate_random_time(1,2);
 
     printf("\t\033[32mKlient %d przybył do sklepu\033[0m i będzie czekał przez %d sekund. [%d/100] \n", pid, stay_time, get_customers_in_shop());
 
@@ -59,7 +57,7 @@ void* customer_function(void* arg) {
         sleep(1);  // Przerwa, aby dać innym procesom czas na działanie
     }
 
-    cashier_id = get_active_cashiers(shared_mem);
+    int cashier_id = get_active_cashiers(shared_mem);
 
     Message message;
     message.mtype = cashier_id;
@@ -90,8 +88,6 @@ void* customer_function(void* arg) {
         break;
     }
     
-    // Zwolnij pamięć tylko raz
-    free(data);  // Zwolnienie pamięci po zakończeniu działania wątku
     return NULL;
 }
 
@@ -131,24 +127,10 @@ void* create_customer_processes(void* arg) {
             exit(1);  // W przypadku błędu, kończymy proces
         }
 
-        // Losowy wybór kasjera dla klienta z zakresu od 1 do active users
-        // int customer_cashier_id = rand() % get_active_cashiers(shared_mem) + 1; 
-        int customer_cashier_id = get_active_cashiers(shared_mem);
         pid_t pid = fork();  // Tworzenie nowego procesu klienta
 
         if (pid == 0) {
-            // Alokacja pamięci dla danych klienta w procesie potomnym
-            CustomerData* data = malloc(sizeof(CustomerData));
-            if (data == NULL) {
-                perror("Błąd alokacji pamięci");
-                exit(1);  // Zakończenie programu w przypadku błędu alokacji
-            }
-
-            // Ustawienie danych klienta
-            data->cashier_id = customer_cashier_id;
-
-            // Wywołanie funkcji, która obsługuje zachowanie klienta
-            customer_function(data);  // Klient działa, przypisany do danego kasjera
+            customer_function();// Wywołanie funkcji, która obsługuje zachowanie klienta
 
             if (safe_sem_post() == -1) {  // Zabezpieczona funkcja sem_post
                 exit(1);  // W przypadku błędu, kończymy proces
@@ -172,7 +154,7 @@ void* create_customer_processes(void* arg) {
 
         // get_customers_in_shop();
         // Losowy czas na następnego klienta
-        sleep(generate_random_time(0, 1));  // Klient może przyjść w losowych odstępach czasu
+        sleep(generate_random_time(1, 3));  // Klient może przyjść w losowych odstępach czasu
     }
 
     // // Zamykamy semafor po zakończeniu tworzenia procesów

@@ -12,7 +12,7 @@ typedef struct {
     pid_t pid;       // PID klienta
 } CustomerData;
 
-void* customer_function(void* arg); 
+void* customer_function(); 
 
 //funkcja tworząca proces klienta
 void* create_customer_processes(void* arg) ;

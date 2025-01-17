@@ -10,7 +10,7 @@
 #include "shared_memory.h"
 #include "manager_cashiers.h"
 #include "firefighter.h"
-
+#include "process_manager.h"
 #include <sys/sem.h>  // Do operacji na semaforach systemowych
 #include <sys/ipc.h> 
 #include <fcntl.h>  // Dla O_CREAT
@@ -64,15 +64,16 @@ int main() {
     signal(SIGINT, mainHandlerProcess);// Rejestracja handlera SIGINT
     shared_mem = init_shared_memory();
 
+    init_semaphore_process();
+
     init_manager(&monitor_thread);  // Tworzenie wątku dla managera kasjerow
 
+    init_firefighter(&firefighter_thread);
 
     if (pthread_create(&customer_thread, NULL, create_customer_processes, NULL) != 0) { // Tworzenie wątku dla klientów
         perror("Błąd tworzenia wątku dla klientów");
         exit(1);
     }
-
-    init_firefighter(&firefighter_thread);
 
     // Czekanie na zakończenie procesów klientów
     wait_for_customers();
@@ -83,6 +84,8 @@ int main() {
 
     //Czyszczenie pamięci dzielonej
     cleanup_shared_memory(shared_mem);
+
+    cleanup_semaphore_process();
 
     destroy_semaphore_customer();
 
