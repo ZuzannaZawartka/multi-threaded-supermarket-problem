@@ -4,7 +4,6 @@
 #include <signal.h>
 #include <pthread.h>
 
-
 const char* orange = "\033[38;5;214m"; // ANSI escape code for orange
 const char* reset = "\033[0m";  // Reset kolorów
 
@@ -13,12 +12,11 @@ void firefighter_sigint_handler(int signum) {
     pthread_exit(NULL); // Bezpośrednie zakończenie wątku
 }
 
-
 // Funkcja odliczania od 5 do 0
 void countdown_to_exit() {
     for (int i = 5; i > 0; i--) {
         printf("%sPożar trwa! [%d]%s\n", orange, i, reset);
-        sleep(1);  // Czeka 1 sekundę
+        sleep(1); 
     }
 }
 
@@ -45,5 +43,15 @@ void init_firefighter(pthread_t *firefighter_thread) {
         exit(1);
     }else{
         printf("Wątek strażaka kasjerów utworzony, id wątku: %ld\n", *firefighter_thread);
+    }
+}
+
+void wait_for_firefighter(pthread_t firefighter_thread) {
+    // Czekanie na zakończenie wątku strażaka
+    if (pthread_join(firefighter_thread, NULL) != 0) {
+        perror("Błąd oczekiwania na wątek strażaka");
+        exit(1);
+    } else {
+        printf("Strażak zakończył swoją pracę.\n");
     }
 }

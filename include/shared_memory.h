@@ -3,22 +3,28 @@
 
 #include <pthread.h>
 #include <semaphore.h>
-#include "cashier.h" //do max cashiers
+ #include "main.h"
 
-#define MAX_CASHIERS 10
 
 typedef struct {
     int queue_ids[MAX_CASHIERS]; // Tablica kolejki komunikatów
-    int active_cashiers;  
+    int active_cashiers;  //ilosc aktywnych kasjerow z zakresu ktorego moga wybierac nowi klienci
 } SharedMemory;
 
+//zarządzanie pamięcią dzielona
 SharedMemory* init_shared_memory();
+SharedMemory* get_shared_memory() ;
 void cleanup_shared_memory(SharedMemory* shared_mem);
+
+//funkcje działające na tablicach kolejek komunikatów z shared memory
 void set_queue_id(SharedMemory* shared_mem, int cashier_id, int queue_id);
 int get_queue_id(SharedMemory* shared_mem, int cashier_id);
-SharedMemory* get_shared_memory() ;
+
+//zarządzanie semaforem do shared memory
 void cleanup_semaphore();
 sem_t* get_semaphore();
+
+//zarządzanie zmienną active_cashier która określa zakres dostępnych kasjerów
 int get_active_cashiers(SharedMemory* shared_mem);
 void decrement_active_cashiers(SharedMemory* shared_mem);
 void increment_active_cashiers(SharedMemory* shared_mem);

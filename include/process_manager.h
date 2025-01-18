@@ -5,11 +5,11 @@
 #include <semaphore.h>
 
 typedef struct ProcessNode {
-    pid_t pid;  // PID procesu
+    pid_t pid;  // PID procesu klienta
     struct ProcessNode* next;  // Wskaźnik do następnego procesu w liście
 } ProcessNode;
 
-extern ProcessNode* process_list;  // Zmienna globalna przechowująca początek listy
+extern ProcessNode* process_list;  // Zmienna globalna przechowująca początek listy procesów klientów
 
 // Funkcje do zarządzania procesami
 void add_process(pid_t pid);

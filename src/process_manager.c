@@ -1,15 +1,13 @@
-#include "process_manager.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <semaphore.h>
 #include <fcntl.h>  // Dla semaforów POSIX
 #include <sys/stat.h>
 #include <errno.h>
-// Lista powiązań przechowująca pidy procesów
-ProcessNode* process_list = NULL;  
+#include "process_manager.h"
 
-
-#define SEM_NAME "/process_list_semaphore"
+#define SEM_NAME "/process_list_semaphore" //nazwa semafora dla listy procesów
+ProcessNode* process_list = NULL;  // Lista powiązań przechowująca pidy procesów
 
 void init_semaphore_process() {
     sem_t* process_list_semaphore = sem_open(SEM_NAME, O_CREAT | O_EXCL, 0666, 1);
@@ -38,7 +36,6 @@ void init_semaphore_process() {
         perror("Błąd zamykania semafora po inicjalizacji");
     }
 }
-
 
 // Funkcja czyszcząca semafor
 void cleanup_semaphore_process() {
@@ -78,7 +75,6 @@ void add_process(pid_t pid) {
         perror("Błąd oczekiwania na semafor");
         return;
     }
-
 
     if (process_exists(pid)) {
         printf("PID %d już istnieje w liście\n", pid);
