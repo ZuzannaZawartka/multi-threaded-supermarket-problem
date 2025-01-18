@@ -105,7 +105,6 @@ void add_process(pid_t pid) {
 
 // Usuń proces z listy
 void remove_process(pid_t pid) {
-    // printf("URUCHOMIENIE REMOVE\n");
     // Uzyskujemy semafor przed manipulowaniem listą
     sem_t* sem = get_semaphore_process();
     if (sem == NULL) {
@@ -149,7 +148,6 @@ void remove_process(pid_t pid) {
 
 // Sprawdź, czy proces o podanym PID istnieje w liście
 int process_exists(pid_t pid) {
-    // printf("URUCHOMIENIE PROCESS_EXISTS\n");
     // Uzyskujemy semafor przed odczytem listy
     sem_t* sem = get_semaphore_process();
     if (sem == NULL) {
@@ -178,7 +176,6 @@ int process_exists(pid_t pid) {
 
 // Czyszczenie wszystkich procesów w liście
 void cleanup_processes() {
-    // printf("CZYSZCZENIE URUCHOMIENIE CLEANUP\n");
     // Uzyskujemy semafor przed manipulowaniem listą
     sem_t* sem = get_semaphore_process();
     if (sem == NULL) {

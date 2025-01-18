@@ -3,6 +3,7 @@
 
 #include <pthread.h>
 #include <signal.h>
+#include "shared_memory.h"
 
 #define MIN_PEOPLE_FOR_CASHIER 3  // Na każdą grupę 5 klientów przypada jeden kasjer
 #define MAX_CASHIERS 10 
@@ -43,5 +44,9 @@ void set_cashier_thread(pthread_t* cashier_threads, int index, pthread_t thread)
 
 int* get_cashier_id_pointer(int* cashier_ids, int index);
 
+
+int get_message_count_for_cashier(int queue_id, long mtype);
+
+int select_cashier_with_fewest_people(SharedMemory* shared_mem) ;
 
 #endif

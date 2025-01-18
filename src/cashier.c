@@ -62,6 +62,7 @@ void create_cashier(pthread_t* cashier_thread, int* cashier_id) {
 
 
 void* cashier_function(void* arg) {
+    srand(time(NULL));
     int cashier_id = *((int*)arg); 
 
     // Przypisanie ID kasjera do wątku
@@ -126,7 +127,9 @@ void* cashier_function(void* arg) {
         printf("Kasjer %d obsługuje klienta o PID = %d\n", cashier_id, message.customer_pid);
 
 
-        sleep(4); //jakis czas obslugi klienta (bedzie randomowy) [jak nie dziala to zamien sleep pod wysylanie klienta]
+        
+
+        sleep((rand() % 8) + 3); //jakis czas obslugi klienta (bedzie randomowy) [jak nie dziala to zamien sleep pod wysylanie klienta]
 
         // Wysłanie odpowiedzi do klienta
         message.mtype = message.customer_pid;

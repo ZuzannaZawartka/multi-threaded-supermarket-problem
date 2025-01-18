@@ -11,6 +11,7 @@
 #include <sys/wait.h>
 #include <errno.h>
 #include "shared_memory.h"
+#include "manager_cashiers.h"
 
 
 #include <semaphore.h>
@@ -39,6 +40,11 @@ void setup_signal_handler_for_customers() {
 
 }
 
+// Funkcja generująca losowy czas od 0.5 do 3 sekund (w mikrosekundach)
+int generate_random_time() {
+    return (rand() % (3000000 - 500000 + 1)) + 500000; // Mikrosekundy
+}
+
 void* customer_function() {
 
     setup_signal_handler_for_customers();
@@ -46,18 +52,17 @@ void* customer_function() {
     // signal(SIGINT, handle_customer_signal); // handler na sygnał i wyjściu
 
     pid_t pid = getpid();
-    int stay_time = generate_random_time(1,2);
+    int stay_time_in_microseconds = generate_random_time();
 
-    printf("\t\033[32mKlient %d przybył do sklepu\033[0m i będzie czekał przez %d sekund. [%d/100] \n", pid, stay_time, get_customers_in_shop());
+    printf("\t\033[32mKlient %d przybył do sklepu\033[0m i będzie czekał przez %d milisekund. [%d/100] \n", pid, stay_time_in_microseconds, get_customers_in_shop());
 
-    // Cykliczne sprawdzanie flagi, czy pożar jest aktywny
     time_t start_time = time(NULL);  // Czas rozpoczęcia chodzenia klienta po sklepie
-    while (difftime(time(NULL), start_time) < stay_time) {
-        // Jeśli flaga nie jest ustawiona, klient dalej chodzi po sklepie
-        sleep(1);  // Przerwa, aby dać innym procesom czas na działanie
+    while (difftime(time(NULL), start_time) < stay_time_in_microseconds / 1000000.0) {
+        // Klient dalej chodzi po sklepie
+        usleep(100000); // Opóźnienie na 0.1 sekundy, by dać czas innym procesom
     }
 
-    int cashier_id = get_active_cashiers(shared_mem);
+    int cashier_id = select_cashier_with_fewest_people(shared_mem);
 
     Message message;
     message.mtype = cashier_id;
@@ -114,6 +119,8 @@ void handle_customer_signal2(int sig) {
 
 //osobny watek na tworzenie klientow
 void* create_customer_processes(void* arg) {
+    srand(time(NULL));
+
     signal(SIGUSR2, handle_customer_signal2);
 
     init_semaphore_customer();
@@ -135,9 +142,6 @@ void* create_customer_processes(void* arg) {
             if (safe_sem_post() == -1) {  // Zabezpieczona funkcja sem_post
                 exit(1);  // W przypadku błędu, kończymy proces
             }
-    
-            
-            // get_customers_in_shop(); //ilosc osob po wyjsciu ze sklepu
 
             exit(0);
         } else if (pid < 0) {
@@ -152,13 +156,11 @@ void* create_customer_processes(void* arg) {
         // Zapisz PID klienta w process managerze
         add_process(pid);
 
-        // get_customers_in_shop();
-        // Losowy czas na następnego klienta
-        sleep(generate_random_time(1, 3));  // Klient może przyjść w losowych odstępach czasu
-    }
 
-    // // Zamykamy semafor po zakończeniu tworzenia procesów
-    // destroy_semaphore_customer();
+        int random_time_in_microseconds = (rand() % (3000000 - 500000 + 1)) + 500000;
+        usleep(random_time_in_microseconds);
+
+    }
 
     return NULL;  // Funkcja musi zwracać 'void*'
 }
@@ -192,11 +194,6 @@ void wait_for_customers() {
             break;  // Kończymy pętlę, ponieważ procesy zakończone i flaga zakończenia pracy jest ustawiona
         }
     }
-}
-
-// Funkcja do generowania losowego czasu (w sekundach)
-int generate_random_time(int min_time, int max_time) {
-    return rand() % (max_time - min_time + 1) + min_time;
 }
 
 

@@ -27,7 +27,7 @@ void wait_for_customers() ;
 void terminate_all_customers();
 
 //generowanie czasu randomowego z zakresu min - max
-int generate_random_time(int min_time, int max_time);
+int generate_random_time();
 
 void handle_customer_signal(int sig, siginfo_t *info, void *ucontext) ;
 

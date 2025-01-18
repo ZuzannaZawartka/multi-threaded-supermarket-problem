@@ -9,7 +9,7 @@
 #include "shared_memory.h"
 #include <errno.h>
 #include <sys/msg.h>  // Dla funkcji msgrcv i msgsnd
-
+#include <limits.h>
 #define MIN_CASHIERS 2
 
 extern SharedMemory* shared_mem;  // Deklaracja pamięci dzielonej
@@ -253,4 +253,83 @@ int* get_cashier_id_pointer(int* cashier_ids, int index) {
     cashier_id = &cashier_ids[index];// Zwracamy wskaźnik do odpowiedniego elementu
     pthread_mutex_unlock(&mutex);  // Zwolnienie mutexu
     return cashier_id;
+}
+
+
+
+// Funkcja zwraca liczbę wiadomości o określonym mtype (cashier_id) w danej kolejce
+int get_message_count_for_cashier(int queue_id, long mtype) {
+    struct msqid_ds queue_info;
+
+    // Uzyskujemy informacje o kolejce, ale jej nie usuwamy
+    if (msgctl(queue_id, IPC_STAT, &queue_info) == -1) {
+        perror("Błąd podczas pobierania informacji o kolejce");
+        return -1;
+    }
+
+    int message_count = 0;
+
+    // Obliczamy liczbę wiadomości w kolejce
+    int current_message_count = queue_info.msg_qnum;
+
+
+    if (current_message_count == 0) {
+        return 0;
+    }
+
+
+    Message msg;
+    for (int i = 0; i < current_message_count; i++) {
+        
+        if (msgrcv(queue_id, &msg, sizeof(msg) - sizeof(long), mtype, IPC_NOWAIT) != -1) { // Używamy msgrcv z IPC_NOWAIT, żeby nie usunąć wiadomości
+            message_count++;  // Zliczamy wiadomość o danym mtype (cashier_id)
+            
+            if (msgsnd(queue_id, &msg, sizeof(msg) - sizeof(long), 0) == -1) { // Przywracamy wiadomość do kolejki - znowu wysyłamy ją na miejsce
+                perror("Błąd przywracania wiadomości do kolejki");
+                return -1;
+            }
+        }
+        else if (errno != ENOMSG) {
+            perror("Błąd podczas odbierania wiadomości");
+            return -1;
+        }
+    }
+
+    return message_count;
+}
+
+// Funkcja zwracająca numer kasjera z najmniejszą liczbą osób w kolejce
+int select_cashier_with_fewest_people(SharedMemory* shared_mem) {
+    int active_cashiers = get_active_cashiers(shared_mem); 
+
+    if (active_cashiers <= 0) {
+        printf("Brak aktywnych kasjerów.\n");
+        return -1; 
+    }
+
+    int min_cashier_id = -1;
+    int min_message_count = INT_MAX; 
+
+    // Przeszukujemy wszystkie aktywne kasjery
+    for (int i = 0; i < active_cashiers; i++) {
+        int queue_id = get_queue_id(shared_mem, i + 1);  // Pobieramy queue_id dla kasjera
+        if (queue_id != -1) {  // Sprawdzamy, czy kolejka jest przypisana
+
+            int message_count = get_message_count_for_cashier(queue_id, i + 1);  // Liczymy wiadomości w kolejce dla kasjera
+
+            // Jeśli liczba wiadomości w tej kolejce jest mniejsza, zapisz ten kasjer
+            if (message_count < min_message_count) {
+                min_message_count = message_count;
+                min_cashier_id = i + 1;  // Numer kasjera z najmniejszą liczbą wiadomości
+            }
+        }
+    }
+
+    if (min_cashier_id == -1) {
+        printf("Nie znaleziono żadnej ważnej kolejki.\n");
+        return -1;  // Brak odpowiednich kolejek
+    }
+
+    // Zwracamy numer kasjera z najmniejszą liczbą osób w kolejce
+    return min_cashier_id;
 }
