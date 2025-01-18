@@ -14,6 +14,7 @@
 #include "process_manager.h"
 #include "shared_memory.h"
 #include "manager_cashiers.h"
+#include "main.h"
 
 #define SEMAPHORE_NAME "/customer_semaphore"
 
@@ -72,7 +73,7 @@ void* customer_function() {
                 exit(1);
             }
         }
-        printf("\t\t\t \033[31mKlient %d opuszcza\033[0m sklep, został obsłużony przez kasjer %d \n", pid, cashier_id);
+        printf("\t\t\t \033[31mKlient %d opuszcza\033[0m sklep, został obsłużony przez kasjer %d  , obecnie : [%d/%d]\n", pid, cashier_id,get_customers_in_shop()-1,MAX_CUSTOMERS);
         break;
     }
     
@@ -99,7 +100,10 @@ void handle_customer_creating_signal_fire(int sig) {
 void* create_customer_processes(void* arg) {
     srand(time(NULL));
 
-    signal(SIGUSR2, handle_customer_creating_signal_fire);
+    if(signal(SIGUSR2, handle_customer_creating_signal_fire) == SIG_ERR) {
+        perror("Błąd przy ustawianiu handlera sygnału");
+        exit(1);
+    }
 
     init_semaphore_customer(); // inicjalizacja semafora zliczającego klientów
     init_semaphore_process(); // inicjalizacja semafora dla listy procesów
@@ -133,7 +137,11 @@ void* create_customer_processes(void* arg) {
         }
         add_process(pid);// Zapisz PID klienta w liście procesów
 
-        usleep(generate_random_time(MIN_TIME_TO_CLIENT,MAX_TIME_TO_CLIENT)); //randomowy czas co jaki generujemy klientów
+        int random_time = generate_random_time(MIN_TIME_TO_CLIENT, MAX_TIME_TO_CLIENT); 
+        if (usleep(random_time) != 0) {
+            perror("Błąd podczas oczekiwania na klienta za pomocą usleep");
+            exit(1); 
+        }
     }
 }
 

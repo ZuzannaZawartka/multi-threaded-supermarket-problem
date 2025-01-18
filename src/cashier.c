@@ -16,7 +16,6 @@ extern SharedMemory* shared_mem; // Deklaracja pamięci dzielonej
 extern pthread_mutex_t mutex;
 extern int current_cashiers;
 
-
 pthread_key_t cashier_thread_key;
 volatile int terminate_flags[MAX_CASHIERS] = {0};  //Flagi dla kasjerów których usuwamy
 
@@ -74,8 +73,14 @@ void* cashier_function(void* arg) {
     }
 
     // Rejestracja handlera sygnału SIGUSR1 oraz SIGHUP
-    signal(SIGHUP, handle_cashier_signal_fire); //sygnał wyjścia na pożar
-    signal(SIGUSR1, closeCashier); //sygnał wyjścia na zamykanie danego kasjera
+    if (signal(SIGHUP, handle_cashier_signal_fire)  == SIG_ERR) { //sygnał wyjścia na pożar
+        perror("Błąd rejestracji handlera sygnału SIGHUP");
+        exit(1);
+    }
+    if( signal(SIGUSR1, closeCashier) == SIG_ERR) { //sygnał wyjścia na zamykanie danego kasjera
+        perror("Błąd rejestracji handlera sygnału SIGUSR1");
+        exit(1);
+    }; 
 
     // Pobieranie identyfikatora kolejki kasjera z pamięci dzielonej
     int queue_id = get_queue_id(shared_mem, cashier_id);
@@ -85,9 +90,17 @@ void* cashier_function(void* arg) {
         if (msgrcv(queue_id, &message, sizeof(message) - sizeof(long), cashier_id, IPC_NOWAIT) == -1) {  // Próba odebrania wiadomości z kolejki
            if (errno == ENOMSG) {
                 
-                pthread_mutex_lock(&mutex);
+                int ret = pthread_mutex_lock(&mutex);
+                if (ret != 0) {
+                    perror("Błąd podczas blokowania mutexa");
+                    exit(1);
+                }
                 int terminate_flag = terminate_flags[cashier_id - 1];// Sprawdzenie flagi końca pracy
-                pthread_mutex_unlock(&mutex);
+                ret = pthread_mutex_unlock(&mutex);
+                if (ret != 0) {
+                    perror("Błąd podczas zwalniania mutexa");
+                    exit(1);
+                }
 
                 if (terminate_flag == 1) { //jesli flaga zakończenia pracy jest aktywna a juz nie ma wiadomosci to mozemy usuwac kasjera
                     struct msqid_ds queue_info;
@@ -102,9 +115,17 @@ void* cashier_function(void* arg) {
                     
                         cleanup_queue(cashier_id);// Czyszczenie kolejki komunikatów
 
-                        pthread_mutex_lock(&mutex);
+                        int ret = pthread_mutex_lock(&mutex);
+                        if (ret != 0) {
+                            perror("Błąd podczas blokowania mutexa");
+                            exit(1);
+                        }
                         terminate_flags[cashier_id-1]=0; // wyzerowanie flagi
-                        pthread_mutex_unlock(&mutex);
+                        ret = pthread_mutex_unlock(&mutex);
+                        if (ret != 0) {
+                            perror("Błąd podczas zwalniania mutexa");
+                            exit(1);
+                        }
 
                         printf("\033[31m[KASJER %d] obsłużył wszystkich\033[0m\n\n", cashier_id);
 
@@ -121,7 +142,11 @@ void* cashier_function(void* arg) {
 
         printf("Kasjer %d obsługuje klienta o PID = %d\n", cashier_id, message.customer_pid);
 
-        usleep(generate_random_time(MIN_CASHIER_OPERATION,MAX_CASHIER_OPERATION)); //jakis czas obslugi klienta (bedzie randomowy)
+        // Czas obsługi klienta - losowy
+        if (usleep(generate_random_time(MIN_CASHIER_OPERATION, MAX_CASHIER_OPERATION)) != 0) {
+            perror("Błąd przy usleep");
+            exit(1);
+        }
 
         // Wysłanie odpowiedzi do klienta
         message.mtype = message.customer_pid;
@@ -134,13 +159,24 @@ void* cashier_function(void* arg) {
 
 }
 
-
 //zamykanie kasjera gdy jest zbyt mało osób
 void closeCashier(int signum) {
     int cashier_id = *((int*)pthread_getspecific(cashier_thread_key));
-    pthread_mutex_lock(&mutex);
+    if (cashier_id == -1) {
+        fprintf(stderr, "Błąd: Brak przypisanego ID kasjera do wątku\n");
+        exit(1); 
+    }
+
+    int ret = pthread_mutex_lock(&mutex);
+    if (ret != 0) {
+        perror("Błąd podczas blokowania mutexa w closeCashier");
+        return;  // W przypadku błędu, nie kontynuujemy
+    }
     terminate_flags[cashier_id-1]=1;
-    pthread_mutex_unlock(&mutex);
+    ret = pthread_mutex_unlock(&mutex);
+    if (ret != 0) {
+        perror("Błąd podczas zwalniania mutexa w closeCashier");
+    }
 }
 
 //koniec pracy kasjera gdy jest pożar
@@ -162,7 +198,10 @@ void wait_for_cashiers(pthread_t* cashier_threads, int num_cashiers) {
             int ret = pthread_join(cashier_thread, &status);  // Czeka na zakończenie wątku
             if (ret == 0) {
                 printf("Wątek kasjera %d zakończył się z kodem: %ld, ttid: %lu\n", i+1, (long)status, cashier_thread);
-             } 
+            } else {
+                // Obsługuje błąd w przypadku niepowodzenia w oczekiwaniu na wątek
+                fprintf(stderr, "Błąd podczas oczekiwania na wątek kasjera %d: %d\n", i+1, ret);
+            }
         }
     }
 }

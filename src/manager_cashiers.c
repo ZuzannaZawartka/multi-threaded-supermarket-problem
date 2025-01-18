@@ -40,7 +40,10 @@ void fire_sigTermHandler(int signum) {
 }
 
 void* manage_customers(void* arg) {
-    signal(SIGTERM, fire_sigTermHandler);  //łapanie sygnału o pożarze
+    if (signal(SIGTERM, fire_sigTermHandler) == SIG_ERR) {//łapanie sygnału o pożarze
+        perror("Błąd przy ustawianiu handlera dla SIGTERM");
+        exit(1); 
+    } 
     create_initial_cashiers(cashier_threads, cashier_ids);
 
     while (1) {
@@ -76,7 +79,7 @@ void* manage_customers(void* arg) {
             int cashier_to_remove = get_current_cashiers() ; // Indeks kasjera do usunięcia
             pthread_t cashier_thread = get_cashier_thread(cashier_threads, cashier_to_remove-1); // Uzyskiwanie wątku kasjera
 
-            printf("\033[38;5;196m [KASJER %d] już nie przyjmuje więcej klientów - Wątek: %ld\033[0m\n", cashier_to_remove, cashier_thread); // Logowanie przed usunięciem kasjera
+            printf("\033[38;5;196m[KASJER %d] już nie przyjmuje więcej klientów - Wątek: %ld\033[0m\n", cashier_to_remove, cashier_thread); // Logowanie przed usunięciem kasjera
 
             // Wysyłamy sygnał do kasjera aby zakończył pracę
             if (pthread_kill(cashier_thread, SIGUSR1) != 0) {
@@ -96,7 +99,7 @@ void* manage_customers(void* arg) {
             decrement_cashiers();
         }
 
-        sleep(1);  // Sprawdzanie stanu co sekundę
+        usleep(500000); // Sprawdzanie stanu co pol sekundy
     }
 
     return NULL;
@@ -128,8 +131,19 @@ void init_manager(pthread_t* manager_thread) {
 
 // Czekanie na zakończenie wątku menedżera
 void wait_for_manager(pthread_t manager_thread) { 
-    pthread_join(manager_thread, NULL); 
-    pthread_mutex_destroy(&mutex);
+    // Czekamy na zakończenie wątku menedżera
+    int ret = pthread_join(manager_thread, NULL);
+    if (ret != 0) {
+        fprintf(stderr, "Błąd podczas czekania na wątek menedżera\n");
+        exit(1);  // Zakończenie programu w przypadku błędu
+    }
+
+    // Próba zniszczenia mutexa
+    ret = pthread_mutex_destroy(&mutex);
+    if (ret != 0) {
+        fprintf(stderr, "Błąd podczas niszczenia mutexa\n");
+        exit(1);  // Zakończenie programu w przypadku błędu
+    }
 }
 
 //zwiększanie liczby kasjerów z mutexem

@@ -67,5 +67,8 @@ void mainHandlerProcess(int signum) {
 
 void set_process_group() {
     pid_t pid = getpid();
-    setpgid(pid, pid);  // Ustawienie głównego procesu jako lidera grupy procesów (po to żeby strażak mógł wysłać poprawnie sygnały)
+     if (setpgid(pid, pid) == -1) {// Ustawienie głównego procesu jako lidera grupy procesów (po to żeby strażak mógł wysłać poprawnie sygnały)
+        perror("Błąd przy ustawianiu grupy procesów");
+        exit(1);  // Zakończenie programu w przypadku błędu
+    } 
 }
