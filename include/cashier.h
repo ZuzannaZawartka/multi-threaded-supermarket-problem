@@ -18,7 +18,4 @@ void wait_for_cashiers(pthread_t* cashier_threads, int num_cashiers);
 void handle_cashier_signal_fire(int sig);
 void cleanAfterCashiers();
 void closeCashier(int signum) ;
-
-// int get_random_sleep_time();
-
 #endif

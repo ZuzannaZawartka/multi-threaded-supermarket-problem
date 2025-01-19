@@ -16,7 +16,7 @@ extern SharedMemory* shared_mem; // Deklaracja pamięci dzielonej
 extern pthread_mutex_t mutex;
 extern int current_cashiers;
 
-pthread_key_t cashier_thread_key;
+pthread_key_t cashier_thread_key;// Klucz dla danych kasjera w pamięci specyficznej dla wątku
 volatile int terminate_flags[MAX_CASHIERS] = {0};  //Flagi dla kasjerów których usuwamy
 
 //inicjalizacja klucza który trzyma cashier_id dla wątku
@@ -36,7 +36,7 @@ void create_cashier(pthread_t* cashier_thread, int* cashier_id) {
     }
 
     // Tworzenie kolejki komunikatu dla kasjera
-    int queue_id = msgget(IPC_PRIVATE, 0666 | IPC_CREAT);
+    int queue_id = msgget(IPC_PRIVATE, 0600 | IPC_CREAT);
     if (queue_id == -1) {
         perror("Błąd tworzenia kolejki komunikatów");
         exit(1);
@@ -143,10 +143,7 @@ void* cashier_function(void* arg) {
         printf("Kasjer %d obsługuje klienta o PID = %d\n", cashier_id, message.customer_pid);
 
         // Czas obsługi klienta - losowy
-        if (usleep(generate_random_time(MIN_CASHIER_OPERATION, MAX_CASHIER_OPERATION)) != 0) {
-            perror("Błąd przy usleep");
-            exit(1);
-        }
+        usleep(generate_random_time(MIN_CASHIER_OPERATION, MAX_CASHIER_OPERATION));
 
         // Wysłanie odpowiedzi do klienta
         message.mtype = message.customer_pid;
@@ -181,16 +178,30 @@ void closeCashier(int signum) {
 
 //koniec pracy kasjera gdy jest pożar
 void handle_cashier_signal_fire(int sig) {
-    while (get_customers_in_shop() > 0 ) {
-        sleep(1); //oczekujemy na wyjście wszystkich klientów
+    // Zapisz czas początkowy
+    time_t start_time = time(NULL);
+
+    while (get_customers_in_shop() > 0) {
+        // Czekaj, aż wszyscy klienci wyjdą
+        sleep(1);  // Oczekiwanie przez 1 sekundę
     }
-    pthread_exit(NULL); 
+
+    // Sprawdzamy, czy minęło co najmniej 5 sekund
+    time_t elapsed_time = time(NULL) - start_time;
+
+    // Jeśli minęło mniej niż 5 sekund i nie ma klientów, czekamy do 5 sekund
+    if (elapsed_time < 5) {
+        sleep(5 - elapsed_time);  // Czekamy, aż upłynie 5 sekund
+    }
+
+    // Kasjer kończy pracę
+    pthread_exit(NULL);
 }
 
 //oczekiwanie na wyjście wszystkich kasjerów
 void wait_for_cashiers(pthread_t* cashier_threads, int num_cashiers) {
     void* status;
-    for (int i = 0; i <= num_cashiers; i++) {
+    for (int i = 0; i < num_cashiers; i++) { //zmienione na < z <=
         pthread_t cashier_thread = get_cashier_thread(cashier_threads, i);
 
         // Sprawdzamy, czy wątek kasjera jest zainicjowany

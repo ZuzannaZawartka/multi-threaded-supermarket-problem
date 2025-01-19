@@ -99,7 +99,7 @@ void* manage_customers(void* arg) {
             decrement_cashiers();
         }
 
-        usleep(500000); // Sprawdzanie stanu co pol sekundy
+        usleep(300000);  // Sprawdzanie stanu co pol sekundy
     }
 
     return NULL;

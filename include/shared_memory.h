@@ -3,8 +3,7 @@
 
 #include <pthread.h>
 #include <semaphore.h>
- #include "main.h"
-
+#include "main.h"
 
 typedef struct {
     int queue_ids[MAX_CASHIERS]; // Tablica kolejki komunikatów

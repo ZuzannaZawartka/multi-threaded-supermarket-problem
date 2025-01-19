@@ -15,7 +15,7 @@
 SharedMemory* init_shared_memory() {
 
     // Tworzenie pamięci dzielonej
-    int shm_id = shmget(SHM_KEY, sizeof(SharedMemory), 0666 | IPC_CREAT);
+    int shm_id = shmget(SHM_KEY, sizeof(SharedMemory), 0600 | IPC_CREAT);
     if (shm_id == -1) {
         perror("Błąd tworzenia pamięci dzielonej");
         exit(1);
@@ -29,7 +29,7 @@ SharedMemory* init_shared_memory() {
     }
 
     // Tworzymy semafor do shared memory, jeśli jeszcze nie istnieje
-    sem_t* shared_mem_semaphore = sem_open(SEM_NAME, O_CREAT, 0666, 1);
+    sem_t* shared_mem_semaphore = sem_open(SEM_NAME, O_CREAT, 0600, 1);
     if (shared_mem_semaphore == SEM_FAILED) {
         perror("Błąd tworzenia semafora");
         exit(1);
@@ -110,7 +110,7 @@ int get_queue_id(SharedMemory* shared_mem, int cashier_id) {
 // Funkcja zwracająca wskaźnik do pamięci dzielonej
 SharedMemory* get_shared_memory() {
     // Przyłączenie do istniejącej pamięci dzielonej
-    int shm_id = shmget(SHM_KEY, sizeof(SharedMemory), 0666);
+    int shm_id = shmget(SHM_KEY, sizeof(SharedMemory), 0600);
     if (shm_id == -1) {
         perror("Błąd przyłączenia do pamięci dzielonej");
         exit(1);
@@ -143,7 +143,7 @@ void cleanup_shared_memory(SharedMemory* shared_mem) {
     }
 
     // Usunięcie segmentu pamięci dzielonej
-    int shm_id = shmget(SHM_KEY, sizeof(SharedMemory), 0666);
+    int shm_id = shmget(SHM_KEY, sizeof(SharedMemory), 0600);
     if (shm_id != -1) {
         if (shmctl(shm_id, IPC_RMID, NULL) == -1) {
             perror("Błąd usuwania pamięci dzielonej");

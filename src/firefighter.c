@@ -3,6 +3,8 @@
 #include <unistd.h>
 #include <signal.h>
 #include <pthread.h>
+#include "customer.h" //funkcja generate_random_time
+#include "main.h" //dla zmiennych MIN_WAIT_FIREFIGHTER_TIME
 
 const char* orange = "\033[38;5;214m"; // ANSI escape code for orange
 const char* reset = "\033[0m";  // Reset kolorów
@@ -22,18 +24,17 @@ void countdown_to_exit() {
 
 void firefighter_process() {
     signal(SIGQUIT, firefighter_sigint_handler);
-    // // int random_time = rand() % 31 + 20;  // Losowanie z zakresu 20-50
-    // int random_time = rand() % 51 + 50;  // Losowanie z zakresu 50-100 sekund
-    // printf("Strażak czeka na %d sekund...\n",random_time);
+   
+    int random_time = generate_random_time(MIN_WAIT_FIREFIGHTER_TIME, MAX_WAIT_FIREFIGHTER_TIME );  // Losowanie z zakresu 50-100 sekund
+    printf("Strażak czeka na %d milisekund...\n",random_time);
 
-    
-    // sleep(random_time);  // Czeka 5 sekund
+    usleep(random_time);  // Czeka 5 sekund
 
-    // // Wysyłanie sygnału SIGINT do wszystkich procesów potomnych głównego procesu
-    // printf("Strażak wysyła SIGINT do wszystkich procesów potomnych...\n");
+    // Wysyłanie sygnału SIGINT do wszystkich procesów potomnych głównego procesu
+    printf("Strażak wysyła SIGINT do wszystkich procesów potomnych...\n");
 
-    // // Wysłanie sygnału SIGINT do wszystkich procesów potomnych
-    // kill(0, SIGINT);  // 0 oznacza, że wysyłamy do wszystkich procesów potomnych w grupie
+    // Wysłanie sygnału SIGINT do wszystkich procesów potomnych
+    kill(0, SIGINT);  // 0 oznacza, że wysyłamy do wszystkich procesów potomnych w grupie
 }
 
 // Funkcja inicjująca strażaka

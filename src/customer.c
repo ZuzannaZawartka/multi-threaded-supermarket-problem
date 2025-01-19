@@ -138,10 +138,8 @@ void* create_customer_processes(void* arg) {
         add_process(pid);// Zapisz PID klienta w liście procesów
 
         int random_time = generate_random_time(MIN_TIME_TO_CLIENT, MAX_TIME_TO_CLIENT); 
-        if (usleep(random_time) != 0) {
-            perror("Błąd podczas oczekiwania na klienta za pomocą usleep");
-            exit(1); 
-        }
+        usleep(random_time);
+
     }
 }
 
@@ -170,7 +168,7 @@ void wait_for_customers() {
 
 //inicjalizacja semafora dla klientów na MAX_CUSTOMER
 void init_semaphore_customer() {
-    sem_t* semaphore = sem_open(SEMAPHORE_NAME, O_CREAT | O_EXCL, S_IRUSR | S_IWUSR, MAX_CUSTOMERS);
+    sem_t* semaphore = sem_open(SEMAPHORE_NAME, O_CREAT | O_EXCL, S_IRUSR | S_IWUSR, MAX_CUSTOMERS); //S_IRUSR: Prawo do odczytu dla właściciela., S_IWUSR: Prawo do zapisu dla właściciela
     if (semaphore == SEM_FAILED) {
         if (errno == EEXIST) {
             printf("Semafor już istnieje, usuwam i tworzę nowy.\n");

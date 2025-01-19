@@ -10,7 +10,7 @@
 ProcessNode* process_list = NULL;  // Lista powiązań przechowująca pidy procesów
 
 void init_semaphore_process() {
-    sem_t* process_list_semaphore = sem_open(SEM_NAME, O_CREAT | O_EXCL, 0666, 1);
+    sem_t* process_list_semaphore = sem_open(SEM_NAME, O_CREAT | O_EXCL, 0600, 1);
     if (process_list_semaphore == SEM_FAILED) {
         if (errno == EEXIST) {
             // Semafor już istnieje - otwieramy go
