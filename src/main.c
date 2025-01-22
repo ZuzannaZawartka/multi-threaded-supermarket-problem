@@ -16,13 +16,20 @@ pthread_t monitor_thread;  // Declare it as a global variable
 pthread_t customer_thread;
 pthread_t firefighter_thread; // Wątek strażaka
 
+// Mutex i zmienna warunkowa
+pthread_mutex_t customers_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t customers_cond = PTHREAD_COND_INITIALIZER;
+
 int main() {
     srand(time(NULL));  
 
     signal(SIGINT, mainHandlerProcess);// Rejestracja handlera SIGINT dla pożaru
+
     shared_mem = init_shared_memory();
+
+    init_semaphore_customer(); // inicjalizacja semafora zliczającego klientów
+    // init_firefighter(&firefighter_thread);// tworzenie wątku dla strażaka
     init_manager(&monitor_thread);  // Tworzenie wątku dla managera kasjerow
-    init_firefighter(&firefighter_thread);// tworzenie wątku dla strażaka
 
     if (pthread_create(&customer_thread, NULL, create_customer_processes, NULL) != 0) { // Tworzenie wątku który tworzy klientów
         perror("Błąd tworzenia wątku dla klientów");
@@ -30,11 +37,12 @@ int main() {
     }
 
     wait_for_customers(); //Czekanie na zakończenie procesów klientów
+    printf("PRZEJSCIE DO MANAGERA \n");
     wait_for_manager(monitor_thread); //usuniecie manadżera
-    wait_for_firefighter(firefighter_thread);//usunięcie strażaka
+    // wait_for_firefighter(firefighter_thread);//usunięcie strażaka
 
     cleanup_shared_memory(shared_mem); //czyszczenie pamięci dzielonej i jej semafora
-    cleanup_semaphore_process();
+    // cleanup_semaphore_process();
     destroy_semaphore_customer();
     printf("KONIEC\n");
     return 0;
@@ -59,9 +67,10 @@ void send_signal_to_firefighter(int signal) {
 }
 
 void mainHandlerProcess(int signum) {
-    send_signal_to_manager(SIGTERM);  // Wysyłanie sygnału do wątku menedżera
     send_signal_to_customers(SIGUSR2);  // Wysyłanie sygnału do klientów
-    send_signal_to_firefighter(SIGQUIT); //wysylanie sygnału do strażaka
+    send_signal_to_manager(SIGTERM);  // Wysyłanie sygnału do wątku menedżera
+
+    // send_signal_to_firefighter(SIGQUIT); //wysylanie sygnału do strażaka
     countdown_to_exit();
 }
 

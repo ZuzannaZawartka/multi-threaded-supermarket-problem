@@ -18,7 +18,7 @@ void firefighter_sigint_handler(int signum) {
 void countdown_to_exit() {
     for (int i = 5; i > 0; i--) {
         printf("%sPożar trwa! [%d]%s\n", orange, i, reset);
-        sleep(1); 
+        // sleep(1); 
     }
 }
 

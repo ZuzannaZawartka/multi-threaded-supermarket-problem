@@ -7,13 +7,13 @@ CFLAGS = -Wall -g -I./include -pthread
 LDFLAGS = -pthread
 
 # Pliki źródłowe (wszystkie pliki C w katalogu src)
-SRC = src/main.c src/customer.c src/cashier.c src/firefighter.c src/process_manager.c src/shared_memory.c src/manager_cashiers.c
+SRC = src/main.c src/customer.c src/cashier.c src/firefighter.c src/shared_memory.c src/manager_cashiers.c
 
 # Pliki obiektowe (dla każdego .c tworzymy .o)
 OBJ = $(SRC:.c=.o)
 
 # Nagłówki
-HEADERS = include/main.h include/customer.h include/cashier.h include/firefighter.h include/process_manager.h include/shared_memory.h include/manager_cashiers.h
+HEADERS = include/main.h include/customer.h include/cashier.h include/firefighter.h include/shared_memory.h include/manager_cashiers.h
 
 # Nazwa pliku wynikowego
 OUT = supermarket

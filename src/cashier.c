@@ -133,7 +133,7 @@ void* cashier_function(void* arg) {
                     }
                 }
 
-                sleep(1); // Jeśli nie ma wiadomości, kasjer czeka
+                // sleep(1); // Jeśli nie ma wiadomości, kasjer czeka
                 continue;
            }
             perror("Błąd odbierania komunikatu kasjer");
@@ -143,7 +143,7 @@ void* cashier_function(void* arg) {
         printf("Kasjer %d obsługuje klienta o PID = %d\n", cashier_id, message.customer_pid);
 
         // Czas obsługi klienta - losowy
-        usleep(generate_random_time(MIN_CASHIER_OPERATION, MAX_CASHIER_OPERATION));
+        // usleep(generate_random_time(MIN_CASHIER_OPERATION, MAX_CASHIER_OPERATION));
 
         // Wysłanie odpowiedzi do klienta
         message.mtype = message.customer_pid;
@@ -181,18 +181,18 @@ void handle_cashier_signal_fire(int sig) {
     // Zapisz czas początkowy
     time_t start_time = time(NULL);
 
-    while (get_customers_in_shop() > 0) {
-        // Czekaj, aż wszyscy klienci wyjdą
-        sleep(1);  // Oczekiwanie przez 1 sekundę
-    }
+    // while (get_customers_in_shop() > 0) {
+    //     // Czekaj, aż wszyscy klienci wyjdą
+    //     //  sleep(1);  // Oczekiwanie przez 1 sekundę
+    // }
 
-    // Sprawdzamy, czy minęło co najmniej 5 sekund
-    time_t elapsed_time = time(NULL) - start_time;
+    // // // Sprawdzamy, czy minęło co najmniej 5 sekund
+    // time_t elapsed_time = time(NULL) - start_time;
 
-    // Jeśli minęło mniej niż 5 sekund i nie ma klientów, czekamy do 5 sekund
-    if (elapsed_time < 5) {
-        sleep(5 - elapsed_time);  // Czekamy, aż upłynie 5 sekund
-    }
+    // // Jeśli minęło mniej niż 5 sekund i nie ma klientów, czekamy do 5 sekund
+    // if (elapsed_time < 5) {
+    //     sleep(5 - elapsed_time);  // Czekamy, aż upłynie 5 sekund
+    // }
 
     // Kasjer kończy pracę
     pthread_exit(NULL);

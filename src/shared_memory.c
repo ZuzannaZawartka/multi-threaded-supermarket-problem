@@ -257,3 +257,73 @@ void decrement_active_cashiers(SharedMemory* shared_mem) {
         perror("Błąd zwolnienia semafora");
     }
 }
+
+
+void increment_customer_count(SharedMemory* shared_mem) {
+    printf("INKREMENTACJA\n");
+    sem_t* sem = get_semaphore();
+    if (sem == NULL) {
+        perror("Błąd uzyskiwania semafora");
+        return;
+    }
+
+    if (sem_wait(sem) == -1) {
+        perror("Błąd oczekiwania na semafor");
+        return;
+    }
+
+    shared_mem->customer_count+=1;
+
+    if (sem_post(sem) == -1) {
+        perror("Błąd zwolnienia semafora");
+    }
+
+      printf("OBECNA WARTOSC %d\n",get_customer_count(shared_mem));
+}
+
+void decrement_customer_count(SharedMemory* shared_mem) {
+    printf("DEKREMENTACJA\n");
+    sem_t* sem = get_semaphore();
+    if (sem == NULL) {
+        perror("Błąd uzyskiwania semafora");
+        return;
+    }
+
+    if (sem_wait(sem) == -1) {
+        perror("Błąd oczekiwania na semafor");
+        return;
+    }
+
+    if (shared_mem->customer_count > 0) {
+        shared_mem->customer_count--;
+    } else {
+        fprintf(stderr, "Błąd: liczba klientów nie może być mniejsza niż 0\n");
+    }
+
+    if (sem_post(sem) == -1) {
+        perror("Błąd zwolnienia semafora");
+    }
+
+    printf("OBECNA WARTOSC %d\n",get_customer_count(shared_mem));
+}
+
+int get_customer_count(SharedMemory* shared_mem) {
+    sem_t* sem = get_semaphore();
+    if (sem == NULL) {
+        perror("Błąd uzyskiwania semafora");
+        return -1;
+    }
+
+    if (sem_wait(sem) == -1) {
+        perror("Błąd oczekiwania na semafor");
+        return -1;
+    }
+
+    int customer_count = shared_mem->customer_count;
+
+    if (sem_post(sem) == -1) {
+        perror("Błąd zwolnienia semafora");
+    }
+    return customer_count;
+}
+
