@@ -8,7 +8,6 @@
 #include "shared_memory.h"
 #include "manager_cashiers.h"
 #include "firefighter.h"
-#include "process_manager.h"
 
 
 SharedMemory* shared_mem;

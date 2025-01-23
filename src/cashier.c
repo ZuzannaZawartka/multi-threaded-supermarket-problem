@@ -133,7 +133,7 @@ void* cashier_function(void* arg) {
                     }
                 }
 
-                 sleep(1); // Jeśli nie ma wiadomości, kasjer czeka
+                //  sleep(1); // Jeśli nie ma wiadomości, kasjer czeka
                 continue;
            }
             perror("Błąd odbierania komunikatu kasjer");
