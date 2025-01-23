@@ -7,7 +7,7 @@
 #define MAX_CUSTOMERS 50  // Maksymalna liczba klientów
 
 #define MIN_TIME_TO_CLIENT 0 //czas co jaki generuja sie klienci (Kasjer sprawdza stan klientów co 0.5 sekundy)
-#define MAX_TIME_TO_CLIENT 0
+#define MAX_TIME_TO_CLIENT 0.5
 
 #define MIN_STAY_CLIENT_TIME 3 //jak długo klient jest w sklepie
 #define MAX_STAY_CLIENT_TIME 5
@@ -23,4 +23,7 @@ void send_signal_to_customers(int signal);
 void send_signal_to_firefighter(int signal);
 void mainHandlerProcess(int signum) ;
 void set_process_group();
+void send_signal_to_group(pid_t pgid, int signal) ;
+
+void ignore_signal_for_main(int signum);
 #endif 

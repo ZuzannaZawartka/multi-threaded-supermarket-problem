@@ -22,7 +22,6 @@ sem_t* customer_semaphore;
 volatile int terminate_customers = 0;
 volatile sig_atomic_t customer_exit_flag = 0; 
 
-
 // Funkcja pomocnicza do logowania z czasem
 void log_semaphore_wait(pid_t pid, const char *semaphore_name, const char *status) {
     time_t now;
@@ -44,18 +43,16 @@ void setup_signal_handler_for_customers() {
 }
 
 
-
-
-
 void* customer_function() {
+    printf("POCZATEK KASJERA %d\n",getpid());
     customer_semaphore = get_semaphore_customer();
     increment_customer_count(shared_mem);
-    setup_signal_handler_for_customers();//inicjalizacja sigaction żeby działało z semaforem
     pid_t pid = getpid();
     int stay_time_in_microseconds = generate_random_time(MIN_STAY_CLIENT_TIME,MAX_STAY_CLIENT_TIME); //losowanie czasu pobytu klienta
  
     printf("\t\033[32mKlient %d przybył do sklepu\033[0m i będzie czekał przez %d milisekund. [%d/%d] \n", pid, stay_time_in_microseconds,get_customer_count(shared_mem),MAX_CUSTOMERS);
 
+    printf("przed time KASJERA %d\n",getpid());
     time_t start_time = time(NULL);  // Czas rozpoczęcia chodzenia klienta po sklepie
     while (difftime(time(NULL), start_time) < stay_time_in_microseconds / 1000000.0) {
         if (customer_exit_flag) {
@@ -63,27 +60,31 @@ void* customer_function() {
         }
         // usleep(100000); // Opóźnienie na 0.1 sekundy, (symulacja klienta w sklepie)
     }
-
+     printf("po time KASJERA %d\n",getpid());
     int cashier_id = 2;//select_cashier_with_fewest_people(shared_mem);//wybór kasjera o najmniejszej kolejce
 
     Message message;
     message.mtype = cashier_id; //ustawiamy mtype na id kasjera aby kasjer mógł odebrać
     message.customer_pid = pid; //ustawiamy pid klienta
 
+      printf("przed get_ququq KASJERA %d\n",getpid());
     int queue_id = get_queue_id(shared_mem, cashier_id); // Korzystanie z pamięci dzielonej, żeby dostać kolejkę
     
+        printf("PO get_ququq KASJERA %d\n",getpid());
+
     // Wysłanie komunikatu do odpowiedniej kolejki kasjera
     if (customer_exit_flag) {
             goto cleanup;  // Przejście do końca funkcji
     }
 
+       printf("PRZED gMSGSND KASJERA %d\n",getpid());
     if (msgsnd(queue_id, &message, sizeof(message) - sizeof(long), 0) == -1) {
         perror("Błąd wysyłania komunikatu");
         goto cleanup;
     }
 
     printf("\t\tKlient %d ( wysłał komunikat do kasy %d. ) Czeka na obsługę.\n", pid, cashier_id);
-
+         printf("PRZED while KASJERA %d\n",getpid());
     while (1) {
         if (msgrcv(queue_id, &message, sizeof(message) - sizeof(long), pid, IPC_NOWAIT) == -1) {
             if (errno == ENOMSG) {
@@ -101,23 +102,18 @@ void* customer_function() {
     }
 
  
-    printf("\t\t\t \033[31mKlient %d opuszcza\033[0m sklep, został obsłużony przez kasjer %d  , obecnie : [%d/%d]\n", pid, cashier_id,get_customer_count(shared_mem)-1,MAX_CUSTOMERS);
+    printf("\t\t\t \033[31mKlient %d opuszcza\033[0m sklep, został obsłużony przez kasjer %d  , obecnie : [%d/%d]\n", pid, cashier_id,get_customer_count(shared_mem),MAX_CUSTOMERS);
     
     cleanup:
-
-    return NULL;
+        printf("koniec KLIENTA %d\n",getpid());
+        return NULL;
 }
 
 //odbiór sygnału o pożarze
 void handle_customer_signal(int sig, siginfo_t *info, void *ucontext) {
-    // decrement_customer_count(shared_mem);
-    // // fflush(stdout);
-    //    // Pętla oczekująca na semafor (sem_post)
-   
-    // printf("Klient %d: Opuszczam sklep.\n", getpid());
-    // exit(0);
-    customer_exit_flag = 1;
-    printf("USTAWIONA FLAGA:()]\n");
+
+    printf("WYSZEDL CUSTOMER :)\n");
+    exit(0); //koniec procesu 
 }
 
 //odbiór sygnału o końcu tworzenia się nowych klientów
@@ -130,6 +126,7 @@ void handle_customer_creating_signal_fire(int sig) {
 
 //osobny watek na tworzenie klientow
 void* create_customer_processes(void* arg) {
+    customer_semaphore = get_semaphore_customer();
     srand(time(NULL));
 
     if(signal(SIGUSR2, handle_customer_creating_signal_fire) == SIG_ERR) {
@@ -150,25 +147,14 @@ void* create_customer_processes(void* arg) {
             continue;
         }
 
-         // Sprawdzamy, czy ustawiono flagę zakończenia
-        if (terminate_customers) {
-            printf("Tworzenie klientów przerwane przez sygnał (flaga zakończenia).\n");
-            safe_sem_post(); // Zwalniamy semafor, bo już nie tworzymy klienta
-            pthread_exit(NULL); // Bezpieczne zakończenie wątku
-        }
-
-
         pid_t pid = fork();  // Tworzenie nowego procesu klienta
 
         
         if (pid == 0) {
-         
+            setup_signal_handler_for_customers();//inicjalizacja sigaction żeby działało z semaforem
             customer_function();// Wywołanie funkcji, która obsługuje zachowanie klienta  
-            decrement_customer_count(shared_mem);  // Dekrementacja liczby klientów
-                // sem_post(customer_semaphore);
-            // if (safe_sem_post() == -1) { 
-            //     exit(1);  
-            // }
+            // decrement_customer_count(shared_mem);  // Dekrementacja liczby klientów
+            printf("WYSZEDL CUSTOMER :)\n");
             exit(0); //koniec procesu 
         } else if (pid < 0) {
             perror("Błąd tworzenia procesu klienta");
@@ -179,33 +165,44 @@ void* create_customer_processes(void* arg) {
         }
 
         int random_time = generate_random_time(MIN_TIME_TO_CLIENT, MAX_TIME_TO_CLIENT); 
-        usleep(random_time);
-
+        // usleep(random_time);
+    
     }
 }
 
 //funkcja czekająca na kończące sie procesy klientów
 void wait_for_customers() {
     int status;
-    while (1) {
-        pid_t finished_pid = waitpid(-1, &status, WNOHANG);  // Sprawdzamy zakończone procesy
-        if (finished_pid > 0) {
 
-        } else if (finished_pid == 0) {
-                // Finalizacja i wyjście
-            // sleep(1);  // Jeśli nie ma zakończonych procesów, po prostu czekamy
+    printf("Czekam na zakończenie wszystkich klientów...\n");
+
+    while (1) {
+        
+        pid_t finished_pid = wait(NULL);  // Czekamy na dowolne dziecko
+        if (finished_pid > 0) {
+            decrement_customer_count(shared_mem);  // Aktualizujemy licznik klientów
+            sem_post(customer_semaphore);
+            printf("Proces klienta %d zakończony. Pozostało klientów: %d\n", 
+                   finished_pid, get_customer_count(shared_mem));
         } else {
-            if (errno != ECHILD) {
+            if (errno == ECHILD) {
+                // Brak więcej dzieci do obsłużenia
+                continue;
+            } else {
                 perror("Błąd czekania na proces w wait_for_customers");
                 exit(1);
             }
         }
-        // Sprawdzamy, czy lista procesów jest pusta i czy flaga zakończenia pracy jest ustawiona
-        if ( terminate_customers == 1) {
-            break;  // Kończymy pętlę, ponieważ procesy zakończone i flaga zakończenia pracy jest ustawiona
+
+        // Jeśli flaga zakończenia pracy jest ustawiona i wszyscy klienci zakończyli
+        if (terminate_customers == 1 && get_customer_count(shared_mem) <= 0) {
+            break;
         }
     }
+
+    printf("KONIEC WAIT FOR CUSTOMER\n");
 }
+
 
 //inicjalizacja semafora dla klientów na MAX_CUSTOMER
 void init_semaphore_customer() {

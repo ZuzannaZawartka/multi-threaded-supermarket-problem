@@ -25,7 +25,7 @@ int main() {
     shared_mem = init_shared_memory();
     signal(SIGINT, mainHandlerProcess);// Rejestracja handlera SIGINT dla pożaru
 
- // inicjalizacja semafora zliczającego klientów
+    // inicjalizacja semafora zliczającego klientów
     // init_firefighter(&firefighter_thread);// tworzenie wątku dla strażaka
     init_manager(&monitor_thread);  // Tworzenie wątku dla managera kasjerow
 
@@ -64,7 +64,11 @@ void send_signal_to_firefighter(int signal) {
 }
 
 void mainHandlerProcess(int signum) {
+        // Wyślij sygnał do całej grupy procesów
+
+
     send_signal_to_customers(SIGUSR2);  // Wysyłanie sygnału do klientów
+
     send_signal_to_manager(SIGTERM);  // Wysyłanie sygnału do wątku menedżera
 
     // send_signal_to_firefighter(SIGQUIT); //wysylanie sygnału do strażaka
