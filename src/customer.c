@@ -21,8 +21,6 @@ extern SharedMemory* shared_mem;  // Dostęp do pamięci dzielonej
 sem_t customer_semaphore; 
 volatile int terminate_customers = 0;
 
-extern pthread_mutex_t customers_mutex;
-extern pthread_cond_t customers_cond;
 
 void setup_signal_handler_for_customers() {
     struct sigaction sa;
@@ -36,19 +34,19 @@ void setup_signal_handler_for_customers() {
 }
 
 void* customer_function() {
-
+    increment_customer_count(shared_mem);
     setup_signal_handler_for_customers();//inicjalizacja sigaction żeby działało z semaforem
     pid_t pid = getpid();
     int stay_time_in_microseconds = generate_random_time(MIN_STAY_CLIENT_TIME,MAX_STAY_CLIENT_TIME); //losowanie czasu pobytu klienta
  
-    printf("\t\033[32mKlient %d przybył do sklepu\033[0m i będzie czekał przez %d milisekund. [%d/%d] \n", pid, stay_time_in_microseconds,get_customers_in_shop(),MAX_CUSTOMERS);
+    printf("\t\033[32mKlient %d przybył do sklepu\033[0m i będzie czekał przez %d milisekund. [%d/%d] \n", pid, stay_time_in_microseconds,get_customer_count(shared_mem),MAX_CUSTOMERS);
 
     time_t start_time = time(NULL);  // Czas rozpoczęcia chodzenia klienta po sklepie
     while (difftime(time(NULL), start_time) < stay_time_in_microseconds / 1000000.0) {
-        //  usleep(100000); // Opóźnienie na 0.1 sekundy, (symulacja klienta w sklepie)
+        usleep(100000); // Opóźnienie na 0.1 sekundy, (symulacja klienta w sklepie)
     }
 
-    int cashier_id = 2;//rand() % get_active_cashiers(shared_mem); //;;select_cashier_with_fewest_people(shared_mem);//wybór kasjera o najmniejszej kolejce
+    int cashier_id = 2;//select_cashier_with_fewest_people(shared_mem);//wybór kasjera o najmniejszej kolejce
 
     Message message;
     message.mtype = cashier_id; //ustawiamy mtype na id kasjera aby kasjer mógł odebrać
@@ -67,7 +65,7 @@ void* customer_function() {
     while (1) {
         if (msgrcv(queue_id, &message, sizeof(message) - sizeof(long), pid, IPC_NOWAIT) == -1) {
             if (errno == ENOMSG) {
-                // sleep(1); //oczekiwanie na wiadomość zwrotną o obsłużeniu przez kasjera
+                usleep(100000); //oczekiwanie na wiadomość zwrotną o obsłużeniu przez kasjera
                 continue;
             } else {
                 perror("Błąd odbierania komunikatu klient od kasjera");
@@ -77,23 +75,22 @@ void* customer_function() {
         break;
     }
 
-
-    printf("\t\t\t \033[31mKlient %d opuszcza\033[0m sklep, został obsłużony przez kasjer %d  , obecnie : [%d/%d]\n", pid, cashier_id,get_customers_in_shop(),MAX_CUSTOMERS);
+ 
+    printf("\t\t\t \033[31mKlient %d opuszcza\033[0m sklep, został obsłużony przez kasjer %d  , obecnie : [%d/%d]\n", pid, cashier_id,get_customer_count(shared_mem)-1,MAX_CUSTOMERS);
     
-    decrement_customer_count(shared_mem);  // Update shared memory count
 
-
-    if (safe_sem_post() == -1) {  // Zabezpieczona funkcja sem_post
-        exit(1);  // W przypadku błędu, kończymy proces
-    }
-
+    
     return NULL;
 
 }
 
 //odbiór sygnału o pożarze
 void handle_customer_signal(int sig, siginfo_t *info, void *ucontext) {
-    
+    decrement_customer_count(shared_mem);
+    // fflush(stdout);
+    // if (safe_sem_post() == -1) {
+    //     exit(1); 
+    // }
     printf("Klient %d: Opuszczam sklep.\n", getpid());
     exit(0);
 }
@@ -114,21 +111,26 @@ void* create_customer_processes(void* arg) {
     }
 
 
+    printf("aktywni kasjerzy %d",get_active_cashiers(shared_mem) );
     while(get_active_cashiers(shared_mem)<MIN_CASHIERS){ //czekamy na stworzenie się kasjerów
-        //  sleep(1);
+        usleep(100000);
     }
 
     while (1) { // Generowanie klientów w nieskończoność
         if (safe_sem_wait() == -1) { 
             exit(1);  
         }
+
         pid_t pid = fork();  // Tworzenie nowego procesu klienta
 
+        
         if (pid == 0) {
-            increment_customer_count(shared_mem);
-            customer_function();// Wywołanie funkcji, która obsługuje zachowanie klienta
-           
-            printf("CZY FUNKCJA TU IDZIE?\n");
+         
+            customer_function();// Wywołanie funkcji, która obsługuje zachowanie klienta  
+                if (safe_sem_post() == -1) {
+                    exit(1); 
+                }
+            decrement_customer_count(shared_mem);
             exit(0); //koniec procesu 
         } else if (pid < 0) {
             perror("Błąd tworzenia procesu klienta");
@@ -139,7 +141,7 @@ void* create_customer_processes(void* arg) {
         }
 
         int random_time = generate_random_time(MIN_TIME_TO_CLIENT, MAX_TIME_TO_CLIENT); 
-        // usleep(random_time);
+        usleep(random_time);
 
     }
 }
@@ -150,9 +152,10 @@ void wait_for_customers() {
     while (1) {
         pid_t finished_pid = waitpid(-1, &status, WNOHANG);  // Sprawdzamy zakończone procesy
         if (finished_pid > 0) {
-           
+
         } else if (finished_pid == 0) {
-            //  sleep(1);  // Jeśli nie ma zakończonych procesów, po prostu czekamy
+          
+            sleep(1);  // Jeśli nie ma zakończonych procesów, po prostu czekamy
         } else {
             if (errno != ECHILD) {
                 perror("Błąd czekania na proces w wait_for_customers");
@@ -180,6 +183,7 @@ void init_semaphore_customer() {
             exit(1);
         }
     }
+    printf("Semafor customer utwozony poprawnie\n");
 }
 
 //usuwanie semafora
@@ -214,12 +218,12 @@ sem_t* get_semaphore_customer() {
 int get_customers_in_shop() {
     sem_t* semaphore = get_semaphore_customer();  // Pobieramy semafor bezpośrednio wewnątrz funkcji
     int value;
-
-
     // Krytyczna część: odczytanie wartości semafora
     if (sem_getvalue(semaphore, &value) == -1) {
         perror("Błąd podczas odczytu wartości semafora");
-        sem_post(semaphore);  // Zwolnienie semafora w przypadku błędu
+        if (safe_sem_post() == -1) {
+            exit(1); 
+        }
         return -1;
     }
 
@@ -255,7 +259,6 @@ int safe_sem_post() {
             return -1;  
         }
     }
-    decrement_customer_count(shared_mem);
     return 0;  
 }
 

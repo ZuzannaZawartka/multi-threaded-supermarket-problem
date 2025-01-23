@@ -22,12 +22,11 @@ pthread_cond_t customers_cond = PTHREAD_COND_INITIALIZER;
 
 int main() {
     srand(time(NULL));  
-
+    init_semaphore_customer();
+    shared_mem = init_shared_memory();
     signal(SIGINT, mainHandlerProcess);// Rejestracja handlera SIGINT dla pożaru
 
-    shared_mem = init_shared_memory();
-
-    init_semaphore_customer(); // inicjalizacja semafora zliczającego klientów
+ // inicjalizacja semafora zliczającego klientów
     // init_firefighter(&firefighter_thread);// tworzenie wątku dla strażaka
     init_manager(&monitor_thread);  // Tworzenie wątku dla managera kasjerow
 
@@ -37,12 +36,11 @@ int main() {
     }
 
     wait_for_customers(); //Czekanie na zakończenie procesów klientów
-    printf("PRZEJSCIE DO MANAGERA \n");
+    // printf("PRZEJSCIE DO MANAGERA \n");
     wait_for_manager(monitor_thread); //usuniecie manadżera
-    // wait_for_firefighter(firefighter_thread);//usunięcie strażaka
+    // // wait_for_firefighter(firefighter_thread);//usunięcie strażaka
 
     cleanup_shared_memory(shared_mem); //czyszczenie pamięci dzielonej i jej semafora
-    // cleanup_semaphore_process();
     destroy_semaphore_customer();
     printf("KONIEC\n");
     return 0;

@@ -133,7 +133,7 @@ void* cashier_function(void* arg) {
                     }
                 }
 
-                // sleep(1); // Jeśli nie ma wiadomości, kasjer czeka
+                 sleep(1); // Jeśli nie ma wiadomości, kasjer czeka
                 continue;
            }
             perror("Błąd odbierania komunikatu kasjer");
@@ -178,22 +178,18 @@ void closeCashier(int signum) {
 
 //koniec pracy kasjera gdy jest pożar
 void handle_cashier_signal_fire(int sig) {
+    int cashier_id = *((int*)pthread_getspecific(cashier_thread_key));
+    if (cashier_id == -1) {
+        fprintf(stderr, "Błąd: Brak przypisanego ID kasjera do wątku\n");
+        exit(1); 
+    }
     // Zapisz czas początkowy
-    time_t start_time = time(NULL);
-
-    // while (get_customers_in_shop() > 0) {
-    //     // Czekaj, aż wszyscy klienci wyjdą
-    //     //  sleep(1);  // Oczekiwanie przez 1 sekundę
-    // }
-
-    // // // Sprawdzamy, czy minęło co najmniej 5 sekund
-    // time_t elapsed_time = time(NULL) - start_time;
-
-    // // Jeśli minęło mniej niż 5 sekund i nie ma klientów, czekamy do 5 sekund
-    // if (elapsed_time < 5) {
-    //     sleep(5 - elapsed_time);  // Czekamy, aż upłynie 5 sekund
-    // }
-
+    while (get_customer_count(shared_mem) > 0) {
+        printf("Pozostali klienci w sklepie %d , semafor %d\n",get_customer_count(shared_mem));
+        fflush(stdin);
+        // Czekaj, aż wszyscy klienci wyjdą
+        // sleep(1);  // Oczekiwanie przez 1 sekundę
+    }
     // Kasjer kończy pracę
     pthread_exit(NULL);
 }

@@ -8,7 +8,7 @@
 #include <fcntl.h>
 #include "shared_memory.h"
 
-#define SHM_KEY 12387 
+#define SHM_KEY 13387 
 #define SEM_NAME "/shared_mem_semaphore" 
 
 // Inicjalizowanie pamięci dzielonej z semaforem POSIX
@@ -52,10 +52,13 @@ SharedMemory* init_shared_memory() {
     }
 
     shared_mem->active_cashiers = 0; //ustawienie aktywnych kasjerów na 0
+    shared_mem->customer_count = 0; //ustawienie aktywnych kasjerów na 0
     if (sem_post(shared_mem_semaphore) == -1) {
         perror("Błąd zwolnienia semafora");
         exit(1);
     }
+    printf("shared memory zainicjalizowane\n");
+
     return shared_mem;
 }
 
@@ -249,6 +252,7 @@ void decrement_active_cashiers(SharedMemory* shared_mem) {
     // Zmniejszenie liczby kasjerów, jeśli jest większa niż 0
     if (shared_mem->active_cashiers > 0) {
         shared_mem->active_cashiers--;
+       
     } else {
         fprintf(stderr, "Błąd: liczba kasjerów nie może być mniejsza niż 0\n");
     }
@@ -260,7 +264,6 @@ void decrement_active_cashiers(SharedMemory* shared_mem) {
 
 
 void increment_customer_count(SharedMemory* shared_mem) {
-    printf("INKREMENTACJA\n");
     sem_t* sem = get_semaphore();
     if (sem == NULL) {
         perror("Błąd uzyskiwania semafora");
@@ -277,12 +280,9 @@ void increment_customer_count(SharedMemory* shared_mem) {
     if (sem_post(sem) == -1) {
         perror("Błąd zwolnienia semafora");
     }
-
-      printf("OBECNA WARTOSC %d\n",get_customer_count(shared_mem));
 }
 
 void decrement_customer_count(SharedMemory* shared_mem) {
-    printf("DEKREMENTACJA\n");
     sem_t* sem = get_semaphore();
     if (sem == NULL) {
         perror("Błąd uzyskiwania semafora");
@@ -293,18 +293,16 @@ void decrement_customer_count(SharedMemory* shared_mem) {
         perror("Błąd oczekiwania na semafor");
         return;
     }
-
     if (shared_mem->customer_count > 0) {
         shared_mem->customer_count--;
-    } else {
-        fprintf(stderr, "Błąd: liczba klientów nie może być mniejsza niż 0\n");
-    }
+     }// else {
+    //     fprintf(stderr, "Błąd: liczba klientów nie może być mniejsza niż 0\n");
+    // }
 
     if (sem_post(sem) == -1) {
         perror("Błąd zwolnienia semafora");
     }
 
-    printf("OBECNA WARTOSC %d\n",get_customer_count(shared_mem));
 }
 
 int get_customer_count(SharedMemory* shared_mem) {
