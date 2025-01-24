@@ -18,10 +18,10 @@ extern SharedMemory* shared_mem;  // Dostęp do pamięci dzielonej
 
 
 // Zmienna atomowa dla flagi
-atomic_int terminate_customers = 0;
+int terminate_customers = 0;
 
 void handle_customer_creating_signal_fire(int sig) {
-    atomic_store(&terminate_customers, 1);
+    terminate_customers=1;
     printf("Zatrzymano tworzenie nowych klientów po sygnale\n");
     pthread_exit(NULL);
 }
@@ -43,7 +43,7 @@ void* create_customer_processes(void* arg) {
 
     while (!terminate_customers) {
         if (safe_sem_wait() == -1) {
-            continue; // Sprawdzamy semafor
+             pthread_exit(NULL);
         }
 
         pid_t pid = fork();
@@ -54,7 +54,6 @@ void* create_customer_processes(void* arg) {
             printf("Child process details:\n");
             printf("  Child PID: %d\n", getpid());
             printf("  Parent PID: %d\n", getppid());
-            printf("  Executable path: %s\n", "./src/customer");
 
             char current_dir[1024];
             if (getcwd(current_dir, sizeof(current_dir)) != NULL) {
@@ -63,7 +62,7 @@ void* create_customer_processes(void* arg) {
 
             // Sprawdzenie flagi przed kontynuowaniem
             // Sprawdzanie flagi w procesie dziecka
-            if (atomic_load(&terminate_customers)) {
+            if (terminate_customers) {
                 printf("Exiting child process due to termination flag\n");
                 exit(0);
             }
@@ -89,7 +88,7 @@ void* create_customer_processes(void* arg) {
 
         // Losowy czas oczekiwania przed utworzeniem kolejnego klienta
         int random_time = generate_random_time(MIN_TIME_TO_CLIENT, MAX_TIME_TO_CLIENT);
-        // usleep(random_time);
+        usleep(random_time);
     }
 
     // Kończenie wątku po ustawieniu flagi
@@ -160,7 +159,7 @@ void wait_for_customers() {
 
     while (1) {
         
-        pid_t finished_pid = wait(NULL);  // Czekamy na dowolne dziecko
+        pid_t finished_pid = wait(NULL); // Czekamy na dowolne dziecko
         if (finished_pid > 0) {
             decrement_customer_count(shared_mem);  // Aktualizujemy licznik klientów
             sem_post(customer_semaphore);
@@ -168,7 +167,9 @@ void wait_for_customers() {
                    finished_pid, get_customer_count(shared_mem));
         } else {
             if (errno == ECHILD) {
-                // Brak więcej dzieci do obsłużenia
+                if (terminate_customers == 1 && get_customer_count(shared_mem) <= 0) {
+                        break;
+                }
                 continue;
             } else {
                 perror("Błąd czekania na proces w wait_for_customers");

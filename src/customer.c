@@ -68,7 +68,7 @@ void customer_function() {
         break;
     }
 
-    printf("\t\t\t \033[31mKlient %d opuszcza\033[0m sklep, został obsłużony przez kasjera %d\n", pid, cashier_id);
+    printf("\t\t\t \033[31mKlient %d opuszcza\033[0m sklep, został obsłużony przez kasjera %d  [%d,%d]\n", pid, cashier_id,get_customer_count(shared_mem),MAX_CUSTOMERS);
 
 
 }

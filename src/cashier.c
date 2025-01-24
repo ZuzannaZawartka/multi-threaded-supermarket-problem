@@ -143,7 +143,7 @@ void* cashier_function(void* arg) {
         printf("Kasjer %d obsługuje klienta o PID = %d\n", cashier_id, message.customer_pid);
 
         // Czas obsługi klienta - losowy
-        // usleep(generate_random_time(MIN_CASHIER_OPERATION, MAX_CASHIER_OPERATION));
+        usleep(generate_random_time(MIN_CASHIER_OPERATION, MAX_CASHIER_OPERATION));
 
         // Wysłanie odpowiedzi do klienta
         message.mtype = message.customer_pid;
@@ -190,6 +190,7 @@ void handle_cashier_signal_fire(int sig) {
         // Czekaj, aż wszyscy klienci wyjdą
         // sleep(1);  // Oczekiwanie przez 1 sekundę
     }
+    printf("KASJER WYCHODZI\n");
     // Kasjer kończy pracę
     pthread_exit(NULL);
 }
@@ -211,6 +212,7 @@ void wait_for_cashiers(pthread_t* cashier_threads, int num_cashiers) {
             }
         }
     }
+    printf("Kasjerzy wyszli\n");
 }
 
 //czyszczenie kolejki komunikatów dla danego kasjera
@@ -232,4 +234,6 @@ void cleanAfterCashiers() {
     for (int i = 1; i <= MAX_CASHIERS; i++) { //od jedynki ponieważ kasjerzy mają id od 1 do 10
         cleanup_queue(i);
     }
+
+    printf("Wyczyszczono\n");
 }

@@ -35,7 +35,7 @@ int main() {
     }
 
     wait_for_customers(); //Czekanie na zakończenie procesów klientów
-    // printf("PRZEJSCIE DO MANAGERA \n");
+    printf("PRZEJSCIE DO MANAGERA \n");
     wait_for_manager(monitor_thread); //usuniecie manadżera
     // // wait_for_firefighter(firefighter_thread);//usunięcie strażaka
 

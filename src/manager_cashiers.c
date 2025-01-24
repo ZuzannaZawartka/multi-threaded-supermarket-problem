@@ -26,6 +26,7 @@ extern pthread_cond_t customers_cond;
 void send_signal_to_cashiers(int signal) {
     int sum_cash = get_current_cashiers();
     for (int i = 0; i < sum_cash; i++) {
+        printf("wysylanie kasjerowi %d",i);
         pthread_t cashier_thread = get_cashier_thread(cashier_threads, i); 
         if (pthread_kill(cashier_thread, signal) != 0) {   //wysylamy sygnal do kasjera aby zakończył pracę
             perror("Error sending signal to cashier thread");
@@ -37,11 +38,12 @@ void send_signal_to_cashiers(int signal) {
 void fire_sigTermHandler(int signum) {   
     send_signal_to_cashiers(SIGHUP); //wysyłamy sygnał
     wait_for_cashiers(cashier_threads, get_current_cashiers()); //czekamy na zakończenie 
-    while (get_current_cashiers()==0){
-        printf("czekamy na kasjerow\n");
-        // usleep(10000);
-    }
+    // while (get_current_cashiers()>0){
+    //     printf("czekamy na kasjerow %d\n",get_current_cashiers());
+    //     // usleep(10000);
+    // }
     cleanAfterCashiers();  // Sprzątanie po kasjerach kolejek komunikatów
+    printf("KONIEC MANADZERA\n");
     pthread_exit(NULL);  // Kasjer kończy pracę
 }
 
@@ -77,8 +79,6 @@ void* manage_customers(void* arg) {
 
                     printf("\033[1;32m[KASJER %d] OTWIERANIE, Obecny zakres kasjerów : 1 - %d\033[0m\n\n", get_current_cashiers(), get_active_cashiers(shared_mem));
         }
-
-        
         //             // Zmniejsz liczbę kasjerów
         //    while (get_customer_count(shared_mem)  < MIN_PEOPLE_FOR_CASHIER * (get_current_cashiers() - 1) && get_current_cashiers() > MIN_CASHIERS) {
         //         printf("USUWANIE     KASJERA\n");
@@ -141,6 +141,7 @@ void wait_for_manager(pthread_t manager_thread) {
         exit(1);  // Zakończenie programu w przypadku błędu
     }
 
+    printf("KOniec waku manadzera\n");
     // Próba zniszczenia mutexa
     ret = pthread_mutex_destroy(&mutex);
     if (ret != 0) {
