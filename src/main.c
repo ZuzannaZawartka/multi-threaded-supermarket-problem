@@ -4,13 +4,13 @@
 #include <pthread.h>
 #include <signal.h>   
 #include <errno.h>   
-#include "customer.h"
+#include "creator_customer.h"
 #include "shared_memory.h"
 #include "manager_cashiers.h"
 #include "firefighter.h"
 
 
-SharedMemory* shared_mem;
+SharedMemory* shared_mem = NULL;
 pthread_t monitor_thread;  // Declare it as a global variable
 pthread_t customer_thread;
 pthread_t firefighter_thread; // Wątek strażaka

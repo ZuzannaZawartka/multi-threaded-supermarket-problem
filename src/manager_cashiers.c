@@ -7,7 +7,7 @@
 #include <limits.h>
 #include <sys/msg.h>  // Dla funkcji msgrcv i msgsnd
 // #include "main.h" //Dla zmiennej MIN_CASHIERS
-#include "customer.h"
+// #include "customer.h"
 #include "shared_memory.h"
 #include "manager_cashiers.h"
 #include "cashier.h"
@@ -62,7 +62,7 @@ void* manage_customers(void* arg) {
         if (required_cashiers < MIN_CASHIERS) {
             required_cashiers = MIN_CASHIERS;
         }
-        //             // Dodaj nowych kasjerów
+        // //             // Dodaj nowych kasjerów
         while ( get_current_cashiers() < required_cashiers && get_current_cashiers() < MAX_CASHIERS) {
                     printf("DODAWANIE KASJERA\n");
                     int new_cashier_id = get_current_cashiers() + 1;
@@ -79,29 +79,29 @@ void* manage_customers(void* arg) {
         }
 
         
-                    // Zmniejsz liczbę kasjerów
-           while (get_customer_count(shared_mem)  < MIN_PEOPLE_FOR_CASHIER * (get_current_cashiers() - 1) && get_current_cashiers() > MIN_CASHIERS) {
-                printf("USUWANIE     KASJERA\n");
-                    decrement_active_cashiers(shared_mem);
-                    int cashier_to_remove = get_current_cashiers(); 
-                    pthread_t cashier_thread = get_cashier_thread(cashier_threads, cashier_to_remove - 1);
+        //             // Zmniejsz liczbę kasjerów
+        //    while (get_customer_count(shared_mem)  < MIN_PEOPLE_FOR_CASHIER * (get_current_cashiers() - 1) && get_current_cashiers() > MIN_CASHIERS) {
+        //         printf("USUWANIE     KASJERA\n");
+        //             decrement_active_cashiers(shared_mem);
+        //             int cashier_to_remove = get_current_cashiers(); 
+        //             pthread_t cashier_thread = get_cashier_thread(cashier_threads, cashier_to_remove - 1);
 
-                    printf("\033[38;5;196m[KASJER %d] już nie przyjmuje więcej klientów - Wątek: %ld\033[0m\n", cashier_to_remove, cashier_thread);
+        //             printf("\033[38;5;196m[KASJER %d] już nie przyjmuje więcej klientów - Wątek: %ld\033[0m\n", cashier_to_remove, cashier_thread);
 
-                    if (pthread_kill(cashier_thread, SIGUSR1) != 0) {
-                        perror("Błąd podczas wysyłania sygnału do kasjera");
-                        continue;
-                    }
+        //             if (pthread_kill(cashier_thread, SIGUSR1) != 0) {
+        //                 perror("Błąd podczas wysyłania sygnału do kasjera");
+        //                 continue;
+        //             }
 
-                    void* status = NULL;
-                    int ret = pthread_join(cashier_thread, &status);
-                    if (ret == 0) {
-                        printf("\033[38;5;196m[KAJSER %d] kasa już zakończyła pracę , kod zakończenia: %ld\033[0m\n", cashier_to_remove, (long)status);
-                    } else {
-                        perror("Błąd podczas oczekiwania na zakończenie wątku kasjera");
-                    }
-                    decrement_cashiers();
-             }
+        //             void* status = NULL;
+        //             int ret = pthread_join(cashier_thread, &status);
+        //             if (ret == 0) {
+        //                 printf("\033[38;5;196m[KAJSER %d] kasa już zakończyła pracę , kod zakończenia: %ld\033[0m\n", cashier_to_remove, (long)status);
+        //             } else {
+        //                 perror("Błąd podczas oczekiwania na zakończenie wątku kasjera");
+        //             }
+        //             decrement_cashiers();
+        //      }
 
       }
     return NULL;

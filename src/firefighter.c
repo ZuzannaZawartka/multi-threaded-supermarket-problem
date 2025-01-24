@@ -3,7 +3,7 @@
 #include <unistd.h>
 #include <signal.h>
 #include <pthread.h>
-#include "customer.h" //funkcja generate_random_time
+// #include "customer.h" //funkcja generate_random_time
 #include "main.h" //dla zmiennych MIN_WAIT_FIREFIGHTER_TIME
 
 const char* orange = "\033[38;5;214m"; // ANSI escape code for orange
