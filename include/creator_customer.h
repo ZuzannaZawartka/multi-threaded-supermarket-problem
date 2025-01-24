@@ -17,7 +17,6 @@ typedef struct {
 void* create_customer_processes(void* arg);          // Creates customer processes
 void wait_for_customers();                           // Wait for all customer processes to finish
 void terminate_all_customers();                      // Terminate all customer processes
-int get_customers_in_shop();                         // Returns the number of customers in the shop
 
 void init_semaphore_customer();                      // Initialize customer semaphore
 void destroy_semaphore_customer();                   // Destroy customer semaphore

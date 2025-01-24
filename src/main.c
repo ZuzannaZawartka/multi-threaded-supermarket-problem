@@ -15,6 +15,8 @@ pthread_t monitor_thread;  // Declare it as a global variable
 pthread_t customer_thread;
 pthread_t firefighter_thread; // Wątek strażaka
 
+
+
 // Mutex i zmienna warunkowa
 pthread_mutex_t customers_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t customers_cond = PTHREAD_COND_INITIALIZER;
@@ -37,7 +39,7 @@ int main() {
     wait_for_customers(); //Czekanie na zakończenie procesów klientów
     printf("PRZEJSCIE DO MANAGERA \n");
     wait_for_manager(monitor_thread); //usuniecie manadżera
-    // // wait_for_firefighter(firefighter_thread);//usunięcie strażaka
+    // wait_for_firefighter(firefighter_thread);//usunięcie strażaka
 
     cleanup_shared_memory(shared_mem); //czyszczenie pamięci dzielonej i jej semafora
     destroy_semaphore_customer();
@@ -46,12 +48,14 @@ int main() {
 }
 
 void send_signal_to_manager(int signal) {
+    printf("SYGNAL MANADZER\n");
     if (pthread_kill(monitor_thread, signal) != 0) {
             perror("Błąd wysyłania sygnału do kasjera");
     }
 }
 
 void send_signal_to_customers(int signal) {
+    printf("SYGNAL DO KLIENTOW ZEBY PRZESTALI\n");
     if (pthread_kill(customer_thread, signal) != 0) {
             perror("Błąd wysyłania sygnału do kasjera");
     }
@@ -64,9 +68,9 @@ void send_signal_to_firefighter(int signal) {
 }
 
 void mainHandlerProcess(int signum) {
-        // Wyślij sygnał do całej grupy procesów
+    // Wyślij sygnał do całej grupy procesów
 
-
+    printf("WYSLANIE SYGNALOW DO MANADZERA KASJERA\n");
     send_signal_to_customers(SIGUSR2);  // Wysyłanie sygnału do klientów
 
     send_signal_to_manager(SIGTERM);  // Wysyłanie sygnału do wątku menedżera

@@ -21,13 +21,14 @@ extern SharedMemory* shared_mem;  // Dostęp do pamięci dzielonej
 int terminate_customers = 0;
 
 void handle_customer_creating_signal_fire(int sig) {
+    printf("DOSTALEM SYGNAL W TWORZENIU KASJEROW o koncu\n");
     terminate_customers=1;
     printf("Zatrzymano tworzenie nowych klientów po sygnale\n");
     pthread_exit(NULL);
 }
 
 void* create_customer_processes(void* arg) {
-    sem_t* customer_semaphore = get_semaphore_customer();
+
     srand(time(NULL));
 
     // Ustawienie sygnału SIGUSR2
@@ -49,36 +50,39 @@ void* create_customer_processes(void* arg) {
         pid_t pid = fork();
         printf("Fork result: %d, Current PID: %d, Parent PID: %d\n", pid, getpid(), getppid());
 
+        if (terminate_customers) {
+                printf("Exiting child process due to termination flag\n");
+                safe_sem_post();
+                exit(0);
+        }
+
         if (pid == 0) {
             // Proces dziecka
             printf("Child process details:\n");
             printf("  Child PID: %d\n", getpid());
             printf("  Parent PID: %d\n", getppid());
 
-            char current_dir[1024];
-            if (getcwd(current_dir, sizeof(current_dir)) != NULL) {
-                printf("  Current working directory: %s\n", current_dir);
-            }
-
-            // Sprawdzenie flagi przed kontynuowaniem
             // Sprawdzanie flagi w procesie dziecka
+            // printf("PROCES %d SPRAWDZA CZY TERMINATED %d\n",getpid(), terminate_customers);
             if (terminate_customers) {
                 printf("Exiting child process due to termination flag\n");
+                safe_sem_post();
                 exit(0);
             }
 
-            // Uruchomienie procesu dziecka
-            char* args[] = {"./src/customer", NULL};
-            execvp(args[0], args);  // Uruchamiamy program klienta
-
-            // Jeśli execvp nie powiedzie się, kończymy
-            perror("Failed to execute customer program");
-            printf("Errno: %d\n", errno);
-            exit(1);
+            // Uruchomienie procesu dziecka za pomocą execl
+            if (execl("./src/customer", "customer", (char *)NULL) == -1) {
+                perror("Failed to execute customer program");
+                exit(1);
+            }
         } else if (pid < 0) {
             // Błąd podczas forka
             perror("Fork failed");
             safe_sem_post();
+        }else{
+            if(terminate_customers){
+                exit(0);
+            }
         }
 
         // Sprawdzamy, czy sygnał zakończenia był aktywowany
@@ -88,7 +92,6 @@ void* create_customer_processes(void* arg) {
 
         // Losowy czas oczekiwania przed utworzeniem kolejnego klienta
         int random_time = generate_random_time(MIN_TIME_TO_CLIENT, MAX_TIME_TO_CLIENT);
-        usleep(random_time);
     }
 
     // Kończenie wątku po ustawieniu flagi
@@ -163,7 +166,7 @@ void wait_for_customers() {
         if (finished_pid > 0) {
             decrement_customer_count(shared_mem);  // Aktualizujemy licznik klientów
             sem_post(customer_semaphore);
-            printf("Proces klienta %d zakończony. Pozostało klientów: %d\n", 
+            printf("\t\tProces klienta %d zakończony. Pozostało klientów: %d\n", 
                    finished_pid, get_customer_count(shared_mem));
         } else {
             if (errno == ECHILD) {
@@ -268,19 +271,24 @@ int safe_sem_post() {
 
 
 
-//czas w mikrosekundach
+
 int generate_random_time(float min_seconds, float max_seconds) {
     if (min_seconds < 0 || max_seconds < 0 || min_seconds > max_seconds) {
         fprintf(stderr, "Błędne wartości zakresu czasu. MIN >= 0, MAX >= 0, a MIN <= MAX.\n");
         return -1;
     }
 
-    // Zamiana sekund na mikrosekundy
-    int min_microseconds = (int)(min_seconds * 1000000);
-    int max_microseconds = (int)(max_seconds * 1000000);
+    // Zamiana sekund na milisekundy (1 sekunda = 1000 milisekund)
+    int min_milliseconds = (int)(min_seconds * 1000);  // 1 sekunda = 1000 milisekund
+    int max_milliseconds = (int)(max_seconds * 1000);  // 1 sekunda = 1000 milisekund
 
-    // Losowy czas w mikrosekundach
-    return (rand() % (max_microseconds - min_microseconds + 1)) + min_microseconds;
+    printf("min time: %d ms\n", min_milliseconds);
+    printf("max time: %d ms\n", max_milliseconds);
+
+    // Losowy czas w milisekundach
+    int random_milliseconds = (rand() % (max_milliseconds - min_milliseconds + 1)) + min_milliseconds;
+
+    return random_milliseconds;  // Zwracamy czas w milisekundach
 }
 
 
@@ -316,3 +324,4 @@ void destroy_semaphore_customer() {
 void log_semaphore_wait(pid_t pid, const char* semaphore_name, const char* action) {
     printf("Proces %d: %s na semaforze %s\n", pid, action, semaphore_name);
 }
+

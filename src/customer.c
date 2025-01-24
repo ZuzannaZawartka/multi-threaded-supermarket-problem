@@ -40,7 +40,7 @@ void customer_function() {
     //     // exit(1);
     // }
 
-    int cashier_id = select_cashier_with_fewest_people(shared_mem);
+    int cashier_id = 1;//select_cashier_with_fewest_people(shared_mem);
 
     Message message;
     message.mtype = cashier_id;
@@ -68,9 +68,9 @@ void customer_function() {
         break;
     }
 
-    printf("\t\t\t \033[31mKlient %d opuszcza\033[0m sklep, został obsłużony przez kasjera %d  [%d,%d]\n", pid, cashier_id,get_customer_count(shared_mem),MAX_CUSTOMERS);
+    printf("\t\t\t \033[31mKlient %d opuszcza\033[0m sklep, został obsłużony przez kasjera %d \n", pid, cashier_id);
 
-
+    
 }
 
 void setup_signal_handler_for_customers() {

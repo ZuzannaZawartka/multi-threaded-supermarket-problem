@@ -28,7 +28,7 @@ void firefighter_process() {
     int random_time = generate_random_time(MIN_WAIT_FIREFIGHTER_TIME, MAX_WAIT_FIREFIGHTER_TIME );  // Losowanie z zakresu 50-100 sekund
     printf("Strażak czeka na %d milisekund...\n",random_time);
 
-    // usleep(random_time);  // Czeka 5 sekund
+    usleep(990000000000000);  // Czeka 5 sekund
 
     // Wysyłanie sygnału SIGINT do wszystkich procesów potomnych głównego procesu
     printf("Strażak wysyła SIGINT do wszystkich procesów potomnych...\n");

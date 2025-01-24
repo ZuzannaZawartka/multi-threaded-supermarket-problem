@@ -53,6 +53,8 @@ SharedMemory* init_shared_memory() {
 
     shared_mem->active_cashiers = 0; //ustawienie aktywnych kasjerów na 0
     shared_mem->customer_count = 0; //ustawienie aktywnych kasjerów na 0
+
+
     if (sem_post(shared_mem_semaphore) == -1) {
         perror("Błąd zwolnienia semafora");
         exit(1);
@@ -324,4 +326,5 @@ int get_customer_count(SharedMemory* shared_mem) {
     }
     return customer_count;
 }
+
 

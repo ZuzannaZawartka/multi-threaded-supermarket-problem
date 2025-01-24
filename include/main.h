@@ -4,16 +4,16 @@
 #define MIN_PEOPLE_FOR_CASHIER 10  // Na każdą grupę 5 klientów przypada jeden kasjer
 #define MAX_CASHIERS 10 //maksymalna liczba kasjerów
 #define MIN_CASHIERS 2 //minimalna liczba kasjerów
-#define MAX_CUSTOMERS 200  // Maksymalna liczba klientów
+#define MAX_CUSTOMERS 10 // Maksymalna liczba klientów
 
 #define MIN_TIME_TO_CLIENT 0 //czas co jaki generuja sie klienci (Kasjer sprawdza stan klientów co 0.5 sekundy)
-#define MAX_TIME_TO_CLIENT 0.0
+#define MAX_TIME_TO_CLIENT 0
 
-#define MIN_STAY_CLIENT_TIME 0.0 //jak długo klient jest w sklepie
-#define MAX_STAY_CLIENT_TIME 0.0
+#define MIN_STAY_CLIENT_TIME 1 //jak długo klient jest w sklepie
+#define MAX_STAY_CLIENT_TIME 3
 
-#define MIN_CASHIER_OPERATION 0.0//czas obslugi kasjera
-#define MAX_CASHIER_OPERATION 0.3
+#define MIN_CASHIER_OPERATION 3//czas obslugi kasjera
+#define MAX_CASHIER_OPERATION 5
 
 #define MIN_WAIT_FIREFIGHTER_TIME 120 //po jakim czasie wywola sie strazak
 #define MAX_WAIT_FIREFIGHTER_TIME 160

@@ -33,4 +33,6 @@ void increment_active_cashiers(SharedMemory* shared_mem);
 void decrement_customer_count(SharedMemory* shared_mem) ;
 void increment_customer_count(SharedMemory* shared_mem);
 int get_customer_count(SharedMemory* shared_mem);
+
+
 #endif  
