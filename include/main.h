@@ -18,6 +18,8 @@
 #define MIN_WAIT_FIREFIGHTER_TIME 120 //po jakim czasie wywola sie strazak
 #define MAX_WAIT_FIREFIGHTER_TIME 160
 
+
+
 void send_signal_to_manager(int signal);
 void send_signal_to_customers(int signal);
 void send_signal_to_firefighter(int signal);

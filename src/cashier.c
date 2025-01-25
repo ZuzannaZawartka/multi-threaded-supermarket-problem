@@ -205,13 +205,13 @@ void handle_cashier_signal_fire(int sig) {
     }
     printf("DOSTALEM SYGNAL KASJER%d",cashier_id);
  
-    // Zapisz czas początkowy
-    while (get_customer_count(shared_mem) > 0) {
-        printf("Pozostali klienci w sklepie %d \n",get_customer_count(shared_mem));
-        // fflush(stdin);
-        // Czekaj, aż wszyscy klienci wyjdą
-        // sleep(1);  // Oczekiwanie przez 1 sekundę
-    }
+    // // Zapisz czas początkowy
+    // while (get_customer_count(shared_mem) > 0) {
+    //     printf("Pozostali klienci w sklepie %d \n",get_customer_count(shared_mem));
+    //     // fflush(stdin);
+    //     // Czekaj, aż wszyscy klienci wyjdą
+    //     // sleep(1);  // Oczekiwanie przez 1 sekundę
+    // }
 
     // Kasjer kończy pracę
     pthread_exit(NULL);
@@ -221,6 +221,7 @@ void handle_cashier_signal_fire(int sig) {
 void wait_for_cashiers(pthread_t* cashier_threads, int num_cashiers) {
     printf("ZOBACZMY CZY ZAMYKAMY KASY\n");
     void* status;
+    num_cashiers = get_current_cashiers();
     for (int i = 0; i < num_cashiers; i++) { //zmienione na < z <=
         pthread_t cashier_thread = get_cashier_thread(cashier_threads, i);
 

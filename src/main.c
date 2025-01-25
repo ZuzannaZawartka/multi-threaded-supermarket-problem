@@ -15,11 +15,15 @@ pthread_t customer_thread;
 pthread_t firefighter_thread; // Wątek strażaka
 pthread_t cleanup_thread; // Wątek strażaka
 
+extern pthread_mutex_t pid_mutex;  // Mutex dla ochrony tablicy PID-ów
+extern pid_t pids[MAX_CUSTOMERS];  // Tablica przechowująca PIDs procesów potomnych
+extern int created_processes ; // Licznik stworzonych procesów
+
 void mainHandlerProcess(int signum) {
 
-    if(get_fire_flag(shared_mem)==1){
-        return;
-    }
+    // if(get_fire_flag(shared_mem)==1){
+    //     return;
+    // }
 
     set_fire_flag(shared_mem,1); 
 
@@ -27,13 +31,11 @@ void mainHandlerProcess(int signum) {
 
     printf("WYSLANIE SYGNALOW DO MANADZERA KASJERA\n");
 
-    send_signal_to_manager(SIGTERM);  // Wysyłanie sygnału do wątku menedżera
+    send_signal_to_manager(SIGALRM);  // Wysyłanie sygnału do wątku menedżera
 
     // send_signal_to_customers(SIGUSR2);  // Wysyłanie sygnału do klientów
 
     countdown_to_exit();
-
- 
 
     // send_signal_to_firefighter(SIGQUIT); //wysylanie sygnału do strażaka
 
@@ -44,6 +46,9 @@ int main() {
     srand(time(NULL));  
     init_semaphore_customer();
     shared_mem = init_shared_memory();
+
+    // Set process group for signal handling
+    set_process_group();
     signal(SIGINT, mainHandlerProcess);// Rejestracja handlera SIGINT dla pożaru
 
     // inicjalizacja semafora zliczającego klientów
@@ -56,20 +61,54 @@ int main() {
         exit(1);
     }
 
-        // Tworzymy wątek do generowania procesów klientów
-    if (pthread_create(&customer_thread, NULL, create_customer_processes, NULL) != 0) {
-        perror("Błąd przy tworzeniu wątku klientów");
-        exit(1);
+
+      // Main loop to fork customer processes
+    while (!get_fire_flag(shared_mem)) {
+        if (safe_sem_wait() == -1) {  // Wait for space to create new customers
+            perror("Błąd podczas oczekiwania na semafor");
+            break;
+        }
+
+        pid_t pid = fork();  // Fork a new process for the customer
+        if (pid < 0) {
+            perror("Fork failed");
+            safe_sem_post();  // Release semaphore if fork fails
+        } else if (pid == 0) {
+            // Child process: Execute customer program
+            if (execl("./src/customer", "customer", (char *)NULL) == -1) {
+                perror("Błąd wykonania programu customer");
+                exit(1);
+            }
+        } else {
+            if (get_fire_flag(shared_mem)) {  // Sprawdź, czy proces ma się zakończyć
+            printf("Proces został utworzony po aktywacji pożaru. Zabijanie PID: %d\n", pid);
+            printf(".........................KILLER\n");
+            kill(pid, SIGTERM);
+            }else{
+       // Parent process: Track the child PID
+            pthread_mutex_lock(&pid_mutex);
+            pids[created_processes++] = pid;  // Save the child PID
+            pthread_mutex_unlock(&pid_mutex);
+            }
+     
+        }
     }
 
-    printf("CZEKAMY NA MENEDŻERA\n");
-    pthread_join(customer_thread, NULL);
+
+    //     // Tworzymy wątek do generowania procesów klientów
+    // if (pthread_create(&customer_thread, NULL, create_customer_processes, NULL) != 0) {
+    //     perror("Błąd przy tworzeniu wątku klientów");
+    //     exit(1);
+    // }
+
+    // printf("CZEKAMY NA MENEDŻERA\n");
+    // pthread_join(customer_thread, NULL);
     
     printf("CZEKAMY NA CZYSZCZENIE\n");
     pthread_join(cleanup_thread, NULL);
 
     printf("czekamy na manago:)\n");
-     wait_for_manager(monitor_thread); //usuniecie manadżera
+    wait_for_manager(monitor_thread); //usuniecie manadżera
 
     // wait_for_firefighter(firefighter_thread);//usunięcie strażaka
 

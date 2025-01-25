@@ -28,6 +28,7 @@ extern pthread_cond_t customers_cond;
 
 void send_signal_to_cashiers(int signal) {
     int sum_cash = get_current_cashiers();
+    printf("wysylanie do kasjerow %d\n\n",sum_cash);
     for (int i = 0; i < sum_cash; i++) {
         printf("wysylanie kasjerowi %d",i);
         pthread_t cashier_thread = get_cashier_thread(cashier_threads, i); 
@@ -53,13 +54,13 @@ void fire_sigTermHandler(int signum) {
 }
 
 void* manage_customers(void* arg) {
-    if (signal(SIGTERM, fire_sigTermHandler) == SIG_ERR) {//łapanie sygnału o pożarze
+    if (signal(SIGALRM, fire_sigTermHandler) == SIG_ERR) {//łapanie sygnału o pożarze
         perror("Błąd przy ustawianiu handlera dla SIGTERM");
         exit(1); 
     } 
     create_initial_cashiers(cashier_threads, cashier_ids);
 
-    while (1) {
+    while (!get_fire_flag(shared_mem)) {
  
         int num_customers = get_customer_count(shared_mem);
        

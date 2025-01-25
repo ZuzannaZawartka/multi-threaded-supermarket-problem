@@ -16,10 +16,12 @@
 
 #define SEMAPHORE_NAME "/customer_semaphore"
 
+
+
+
 pthread_mutex_t pid_mutex = PTHREAD_MUTEX_INITIALIZER;  // Mutex dla ochrony tablicy PID-ów
 pid_t pids[MAX_CUSTOMERS];  // Tablica przechowująca PIDs procesów potomnych
 int created_processes = 0;  // Licznik stworzonych procesów
-
 
 extern SharedMemory* shared_mem;  // Dostęp do pamięci dzielonej
 
@@ -73,8 +75,17 @@ void* cleanup_processes(void* arg) {
             }
         }
 
+           // Terminate any remaining processes forcefully after a timeout
+        if (get_fire_flag(shared_mem)) {
+            for (int i = 0; i < created_processes; i++) {
+                printf("Forcefully killing process %d\n", pids[i]);
+                kill(pids[i], SIGTERM);
+            }
+            created_processes = 0;  // Clear all processes
+        }
+
         pthread_mutex_unlock(&pid_mutex);  // Zwolnienie mutexu po modyfikacji
-    //  usleep(100000);  // Opóźnienie przed kolejnym sprawdzeniem zakończonych procesów
+    // usleep(100000);  // Opóźnienie przed kolejnym sprawdzeniem zakończonych procesów
     }
 
     printf("Koniec czyszczenia procesów.\n");
