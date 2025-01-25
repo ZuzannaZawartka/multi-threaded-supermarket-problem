@@ -21,6 +21,8 @@ void mainHandlerProcess(int signum) {
         return;
     }
 
+    set_fire_flag(shared_mem,1); 
+
     // Wyślij sygnał do całej grupy procesów
 
     printf("WYSLANIE SYGNALOW DO MANADZERA KASJERA\n");
@@ -31,7 +33,7 @@ void mainHandlerProcess(int signum) {
 
     countdown_to_exit();
 
-    set_fire_flag(shared_mem,1); 
+ 
 
     // send_signal_to_firefighter(SIGQUIT); //wysylanie sygnału do strażaka
 

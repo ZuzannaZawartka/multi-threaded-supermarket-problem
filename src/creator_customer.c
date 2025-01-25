@@ -99,43 +99,50 @@ void* create_customer_processes(void* arg) {
 
         pid = fork();
 
-        printf("FORK RESULT %d, parent pid :%d\n",getpid(),getppid());
-        if (pid == -1) {
-              printf("FORK RESULT w errorze %d, parent pid :%d\n",getpid(),getppid());
+        // printf("FORK RESULT %d, parent pid :%d\n",getpid(),getppid());
+        if (pid <0) {
+            //   printf("FORK RESULT w errorze %d, parent pid :%d\n",getpid(),getppid());
             perror("fork failed");
             safe_sem_post();  // Zwolnij semafor w przypadku błędu
-            printf("FORK RESULT %d, w error po sem post parent pid :%d\n",getpid(),getppid());
-            exit(1);
+            // printf("FORK RESULT %d, w error po sem post parent pid :%d\n",getpid(),getppid());
+            pthread_exit(NULL);
         } else if (pid == 0) {
-              printf("FORK RESULT %d, w dziecku parent pid :%d\n",getpid(),getppid());
-            // if(get_fire_flag(shared_mem)==1){
-            //      printf("JESTEM TUTAJ %d",getpid());
-            // }
+            //   printf("FORK RESULT %d, w dziecku parent pid :%d\n",getpid(),getppid());
 
-              printf("FORK RESULT %d,przed exec parent pid :%d\n",getpid(),getppid());
+            // Mutex do ochrony tablicy PID-ów i zmiennej created_processes
+           
+            //   printf("FORK RESULT %d,przed exec parent pid :%d\n",getpid(),getppid());
             // Proces klienta   
             if (execl("./src/customer", "customer", (char *)NULL) == -1) {
                 perror("Failed to execute customer program");
-                exit(1);
+                 pthread_exit(NULL);
             }
-              printf("FORK RESULT %d,po exec parent pid :%d\n",getpid(),getppid());
-            exit(0);
+            //   printf("FORK RESULT %d,po exec parent pid :%d\n",getpid(),getppid());
            
         } else {
 
-            printf("w else FORK RESULT %d, parent pid :%d\n",getpid(),getppid());
-            // Mutex do ochrony tablicy PID-ów i zmiennej created_processes
-            pthread_mutex_lock(&pid_mutex);  // Blokujemy mutex przed modyfikacją
+
+             pthread_mutex_lock(&pid_mutex);  // Blokujemy mutex przed modyfikacją
             pids[created_processes] = pid;  // Zapisywanie PID procesu potomnego
             created_processes++;  // Zwiększamy licznik procesów
             pthread_mutex_unlock(&pid_mutex);  // Zwolnienie mutexu po modyfikacji
+            // printf("w else FORK RESULT %d, parent pid :%d\n",getpid(),getppid());
 
-            printf("FORK RESULT %d,PO WSZSTKIM parent pid :%d\n",getpid(),getppid());
+
+            // printf("FORK RESULT %d,PO WSZSTKIM parent pid :%d\n",getpid(),getppid());
+
+            // if(get_fire_flag(shared_mem)==1){
+            //     printf("ZABITY PROCES PO WSZYTSKIM %d\n", getpid());
+            //     exit(0);
+            // }
             
         }
 
-          printf("FORK RESULT %d, parent pid :%d A TU TO NIE WIEM JZ\n",getpid(),getppid());
-        //  usleep(10);
+        //   printf("FORK RESULT %d, parent pid :%d A TU TO NIE WIEM JZ\n",getpid(),getppid());
+    //       int min_time = 200000;  // 0.5 sekundy w mikrosekundach
+    // int max_time = 800000; // 1 sekunda w mikrosekundach
+    // int random_time = min_time + rand() % (max_time - min_time + 1);
+    // usleep(random_time);
     }
 
     return NULL;

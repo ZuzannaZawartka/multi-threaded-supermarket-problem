@@ -49,7 +49,7 @@ void customer_function() {
     //     // exit(1);
     // }
 
-    int cashier_id = 1;//select_cashier_with_fewest_people(shared_mem);
+    int cashier_id = get_active_cashiers(shared_mem);//select_cashier_with_fewest_people(shared_mem);
 
     Message message;
     message.mtype = cashier_id;

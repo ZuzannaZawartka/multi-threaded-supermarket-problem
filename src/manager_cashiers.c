@@ -18,9 +18,12 @@ pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_t cashier_threads[MAX_CASHIERS];
 int cashier_ids[MAX_CASHIERS];
 int current_cashiers = 0;  // Liczba kasjerów działających
+int terminate_flags[MAX_CASHIERS] = {0};  //Flagi dla kasjerów których usuwamy
 
 extern pthread_mutex_t customers_mutex;
 extern pthread_cond_t customers_cond;
+
+
 
 
 void send_signal_to_cashiers(int signal) {
@@ -89,16 +92,28 @@ void* manage_customers(void* arg) {
                     printf("aktywny uzytkownicy %d\n", get_active_cashiers(shared_mem));
                     int cashier_to_remove =  get_current_cashiers() ; 
                     pthread_t cashier_thread = get_cashier_thread(cashier_threads, cashier_to_remove - 1);
+                     int ret = pthread_mutex_lock(&mutex);
+                    if (ret != 0) {
+                        perror("Błąd podczas blokowania mutexa w closeCashier");
+                        pthread_exit(NULL);
+                    }
+                    printf("pobieranie klucza\n \n");
+                    terminate_flags[cashier_to_remove - 1]=1;
+                    ret = pthread_mutex_unlock(&mutex);
+                    if (ret != 0) {
+                        perror("Błąd podczas zwalniania mutexa w closeCashier");
+                         pthread_exit(NULL);
+                    }
 
                     printf("\033[38;5;196m[KASJER %d] już nie przyjmuje więcej klientów - Wątek: %ld\033[0m\n", cashier_to_remove, cashier_thread);
-                    if (pthread_kill(cashier_thread, SIGUSR1) != 0) {
-                        perror("Błąd podczas wysyłania sygnału do kasjera");
-                        continue;
-                    }
+                    // if (pthread_kill(cashier_thread, SIGUSR1) != 0) {
+                    //     perror("Błąd podczas wysyłania sygnału do kasjera");
+                    //     continue;
+                    // }
                     printf("OCZEKIWANIE NA KASJERA AZ ZAMKNIE\n");
                     void* status = NULL;
-                    int ret = pthread_join(cashier_thread, &status);
-                    if (ret == 0) {
+                    int ret2 = pthread_join(cashier_thread, &status);
+                    if (ret2 == 0) {
                         printf("\033[38;5;196m[KAJSER %d] kasa już zakończyła pracę , kod zakończenia: %ld\033[0m\n", cashier_to_remove, (long)status);
                     } else {
                         perror("Błąd podczas oczekiwania na zakończenie wątku kasjera");
@@ -108,7 +123,6 @@ void* manage_customers(void* arg) {
 
       }
     return NULL;
-  
 }
 
 void create_initial_cashiers(pthread_t* cashier_threads, int* cashier_ids) {
