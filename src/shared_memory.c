@@ -328,3 +328,48 @@ int get_customer_count(SharedMemory* shared_mem) {
 }
 
 
+// Funkcja ustawiająca flagę pożaru w pamięci dzielonej
+void set_fire_flag(SharedMemory* shared_mem, int fire_status) {
+    sem_t* sem = get_semaphore();
+    if (sem == NULL) {
+        perror("Błąd uzyskiwania semafora");
+        return;
+    }
+
+    if (sem_wait(sem) == -1) {
+        perror("Błąd oczekiwania na semafor");
+        return;
+    }
+
+    // Ustawienie flagi pożaru
+    shared_mem->fire_flag = fire_status;
+
+    if (sem_post(sem) == -1) {
+        perror("Błąd zwolnienia semafora");
+    }
+}
+
+// Funkcja zwracająca flagę pożaru z pamięci dzielonej
+int get_fire_flag(SharedMemory* shared_mem) {
+    sem_t* sem = get_semaphore();
+    if (sem == NULL) {
+        perror("Błąd uzyskiwania semafora");
+        return -1;
+    }
+
+    if (sem_wait(sem) == -1) {
+        perror("Błąd oczekiwania na semafor");
+        return -1;
+    }
+
+    // Odczytanie flagi pożaru
+    int fire_status = shared_mem->fire_flag;
+
+    if (sem_post(sem) == -1) {
+        perror("Błąd zwolnienia semafora");
+    }
+
+    return fire_status;
+}
+
+

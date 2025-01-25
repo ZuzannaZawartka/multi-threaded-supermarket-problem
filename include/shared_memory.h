@@ -9,6 +9,7 @@ typedef struct {
     int queue_ids[MAX_CASHIERS]; // Tablica kolejki komunikatów
     int active_cashiers;  //ilosc aktywnych kasjerow z zakresu ktorego moga wybierac nowi klienci
     int customer_count;
+    int fire_flag;  
 } SharedMemory;
 
 //zarządzanie pamięcią dzielona
@@ -34,5 +35,9 @@ void decrement_customer_count(SharedMemory* shared_mem) ;
 void increment_customer_count(SharedMemory* shared_mem);
 int get_customer_count(SharedMemory* shared_mem);
 
+
+
+void set_fire_flag(SharedMemory* shared_mem, int fire_status);
+int get_fire_flag(SharedMemory* shared_mem);
 
 #endif  

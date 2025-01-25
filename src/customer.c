@@ -25,8 +25,17 @@ void handle_customer_signal(int sig, siginfo_t *info, void *ucontext) {
 
 // Funkcja zachowania klienta
 void customer_function() {
-     printf("jest klient w funkcji %d",getpid());
+    printf("utworzenie sie klienta %d\n", getpid());
     shared_mem = get_shared_memory();
+
+    if(get_fire_flag(shared_mem)==1){
+
+        printf("XZABITU W KLIENICE %d\n",getpid());
+        exit(0);
+    }
+    // block_signal_SIGTERM();
+
+  
     increment_customer_count(shared_mem);
 
     pid_t pid = getpid();
@@ -70,7 +79,7 @@ void customer_function() {
 
     printf("\t\t\t \033[31mKlient %d opuszcza\033[0m sklep, został obsłużony przez kasjera %d \n", pid, cashier_id);
 
-    
+     exit(0); 
 }
 
 void setup_signal_handler_for_customers() {
@@ -79,7 +88,7 @@ void setup_signal_handler_for_customers() {
     sa.sa_flags = SA_SIGINFO | SA_RESTART;  // Dodaj SA_RESTART, aby wznowić przerwane wywołania systemowe
     sigemptyset(&sa.sa_mask);  // inicjacja maski sygnałów
 
-    if (sigaction(SIGINT, &sa, NULL) == -1) {  // Obsługuje sygnał SIGINT
+    if (sigaction(SIGTERM, &sa, NULL) == -1) {  // Obsługuje sygnał SIGINT
         perror("Błąd przy ustawianiu handlera dla SIGINT");
         exit(1);
     }

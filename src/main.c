@@ -9,19 +9,36 @@
 #include "manager_cashiers.h"
 #include "firefighter.h"
 
-
 SharedMemory* shared_mem = NULL;
 pthread_t monitor_thread;  // Declare it as a global variable
 pthread_t customer_thread;
 pthread_t firefighter_thread; // Wątek strażaka
+pthread_t cleanup_thread; // Wątek strażaka
 
+void mainHandlerProcess(int signum) {
 
+    if(get_fire_flag(shared_mem)==1){
+        return;
+    }
 
-// Mutex i zmienna warunkowa
-pthread_mutex_t customers_mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t customers_cond = PTHREAD_COND_INITIALIZER;
+    // Wyślij sygnał do całej grupy procesów
+
+    printf("WYSLANIE SYGNALOW DO MANADZERA KASJERA\n");
+
+    send_signal_to_manager(SIGTERM);  // Wysyłanie sygnału do wątku menedżera
+
+    // send_signal_to_customers(SIGUSR2);  // Wysyłanie sygnału do klientów
+
+    countdown_to_exit();
+
+    set_fire_flag(shared_mem,1); 
+
+    // send_signal_to_firefighter(SIGQUIT); //wysylanie sygnału do strażaka
+
+}
 
 int main() {
+    printf("MAIN WYWOLANY \n");
     srand(time(NULL));  
     init_semaphore_customer();
     shared_mem = init_shared_memory();
@@ -31,15 +48,29 @@ int main() {
     // init_firefighter(&firefighter_thread);// tworzenie wątku dla strażaka
     init_manager(&monitor_thread);  // Tworzenie wątku dla managera kasjerow
 
-    if (pthread_create(&customer_thread, NULL, create_customer_processes, NULL) != 0) { // Tworzenie wątku który tworzy klientów
-        perror("Błąd tworzenia wątku dla klientów");
+    // Tworzymy wątek do czyszczenia zakończonych procesów
+    if (pthread_create(&cleanup_thread, NULL, cleanup_processes, NULL) != 0) {
+        perror("Błąd przy tworzeniu wątku czyszczącego");
         exit(1);
     }
 
-    wait_for_customers(); //Czekanie na zakończenie procesów klientów
-    printf("PRZEJSCIE DO MANAGERA \n");
-    wait_for_manager(monitor_thread); //usuniecie manadżera
+        // Tworzymy wątek do generowania procesów klientów
+    if (pthread_create(&customer_thread, NULL, create_customer_processes, NULL) != 0) {
+        perror("Błąd przy tworzeniu wątku klientów");
+        exit(1);
+    }
+
+    printf("CZEKAMY NA MENEDŻERA\n");
+    pthread_join(customer_thread, NULL);
+    
+    printf("CZEKAMY NA CZYSZCZENIE\n");
+    pthread_join(cleanup_thread, NULL);
+
+    printf("czekamy na manago:)\n");
+     wait_for_manager(monitor_thread); //usuniecie manadżera
+
     // wait_for_firefighter(firefighter_thread);//usunięcie strażaka
+
 
     cleanup_shared_memory(shared_mem); //czyszczenie pamięci dzielonej i jej semafora
     destroy_semaphore_customer();
@@ -67,17 +98,7 @@ void send_signal_to_firefighter(int signal) {
     }
 }
 
-void mainHandlerProcess(int signum) {
-    // Wyślij sygnał do całej grupy procesów
 
-    printf("WYSLANIE SYGNALOW DO MANADZERA KASJERA\n");
-    send_signal_to_customers(SIGUSR2);  // Wysyłanie sygnału do klientów
-
-    send_signal_to_manager(SIGTERM);  // Wysyłanie sygnału do wątku menedżera
-
-    // send_signal_to_firefighter(SIGQUIT); //wysylanie sygnału do strażaka
-    countdown_to_exit();
-}
 
 void set_process_group() {
     pid_t pid = getpid();

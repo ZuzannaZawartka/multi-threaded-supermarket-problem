@@ -25,10 +25,10 @@ void countdown_to_exit() {
 void firefighter_process() {
     signal(SIGQUIT, firefighter_sigint_handler);
    
-    int random_time = generate_random_time(MIN_WAIT_FIREFIGHTER_TIME, MAX_WAIT_FIREFIGHTER_TIME );  // Losowanie z zakresu 50-100 sekund
-    printf("Strażak czeka na %d milisekund...\n",random_time);
+    // int random_time = generate_random_time(MIN_WAIT_FIREFIGHTER_TIME, MAX_WAIT_FIREFIGHTER_TIME );  // Losowanie z zakresu 50-100 sekund
+    // printf("Strażak czeka na %d milisekund...\n",random_time);
 
-    usleep(990000000000000);  // Czeka 5 sekund
+    usleep(9900000);  // Czeka 5 sekund
 
     // Wysyłanie sygnału SIGINT do wszystkich procesów potomnych głównego procesu
     printf("Strażak wysyła SIGINT do wszystkich procesów potomnych...\n");

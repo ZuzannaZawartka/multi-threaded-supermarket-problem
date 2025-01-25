@@ -11,183 +11,136 @@
 #include <sys/stat.h>
 #include "creator_customer.h"
 #include <stdatomic.h>
+#include <stdbool.h>
+#include <sys/wait.h>
 
 #define SEMAPHORE_NAME "/customer_semaphore"
 
+pthread_mutex_t pid_mutex = PTHREAD_MUTEX_INITIALIZER;  // Mutex dla ochrony tablicy PID-ów
+pid_t pids[MAX_CUSTOMERS];  // Tablica przechowująca PIDs procesów potomnych
+int created_processes = 0;  // Licznik stworzonych procesów
+
+
 extern SharedMemory* shared_mem;  // Dostęp do pamięci dzielonej
 
+void block_signal_SIGINT() {
+    // Tworzenie maski sygnałów
+    sigset_t block_set;
+    sigemptyset(&block_set);            // Tworzenie pustej maski
+    sigaddset(&block_set, SIGINT);      // Dodanie SIGINT do maski
 
-// Zmienna atomowa dla flagi
-int terminate_customers = 0;
-
-void handle_customer_creating_signal_fire(int sig) {
-    printf("DOSTALEM SYGNAL W TWORZENIU KASJEROW o koncu\n");
-    terminate_customers=1;
-    printf("Zatrzymano tworzenie nowych klientów po sygnale\n");
-    pthread_exit(NULL);
-}
-
-void* create_customer_processes(void* arg) {
-
-    srand(time(NULL));
-
-    // Ustawienie sygnału SIGUSR2
-    if (signal(SIGUSR2, handle_customer_creating_signal_fire) == SIG_ERR) {
-        perror("Błąd przy ustawianiu handlera sygnału");
+    // Blokowanie sygnału SIGINT w tym wątku
+    if (pthread_sigmask(SIG_BLOCK, &block_set, NULL) != 0) {
+        perror("Nie udało się zablokować SIGINT w wątku");
         pthread_exit(NULL);
     }
 
-    // Czekamy na aktywnych kasjerów
-    while (get_active_cashiers(shared_mem) < MIN_CASHIERS) {
-        // usleep(100000); // Czekamy na utworzenie kasjerów
+    printf("SIGINT został zablokowany w tym wątku.\n");
+}
+
+
+void* cleanup_processes(void* arg) {
+
+    // block_signal_SIGINT();
+
+
+    int status;
+    pid_t finished_pid;
+
+    while (1) {
+        // Sprawdzanie, czy zakończyć pętlę (brak klientów i flaga terminate_cleanup ustawiona)
+        pthread_mutex_lock(&pid_mutex);  // Blokujemy mutex przed modyfikacją
+
+        if (get_fire_flag(shared_mem) && created_processes == 0) {
+            printf("Zakończenie czyszczenia procesów: Brak klientów i zakończenie flagi.\n");
+            pthread_mutex_unlock(&pid_mutex);
+            break;  // Zakończenie pętli, jeśli nie ma klientów i flaga jest ustawiona
+        }
+
+        // Sprawdzamy zakończone procesy i usuwamy ich PID z tablicy
+        for (int i = 0; i < created_processes; i++) {
+            finished_pid = waitpid(pids[i], &status, WNOHANG);  // Zwróci PID zakończonego procesu
+            if (finished_pid > 0) {
+                // Proces zakończony, usuwamy go z tablicy
+                // printf("Proces %d zakończył działanie, usuwam z tablicy PID.\n", finished_pid);
+                for (int j = i; j < created_processes - 1; j++) {
+                    pids[j] = pids[j + 1];  // Przesuwamy elementy w tablicy
+                }
+                created_processes--;  // Zmniejszamy licznik procesów
+                decrement_customer_count(shared_mem);  // Aktualizujemy licznik klientów
+                safe_sem_post();
+                i--;  // Adjust index to check next process in position
+            }
+        }
+
+        pthread_mutex_unlock(&pid_mutex);  // Zwolnienie mutexu po modyfikacji
+    //  usleep(100000);  // Opóźnienie przed kolejnym sprawdzeniem zakończonych procesów
     }
 
-    while (!terminate_customers) {
+    printf("Koniec czyszczenia procesów.\n");
+    return NULL;
+}
+
+
+void* create_customer_processes(void* arg) {
+    pid_t pid;
+
+    
+    // Sprawdzamy, czy mamy wystarczającą liczbę kasjerów
+    while (get_active_cashiers(shared_mem) < MIN_CASHIERS) {
+        // sleep(1);
+    }
+
+    while (get_fire_flag(shared_mem)!=1) {
         if (safe_sem_wait() == -1) {
-             pthread_exit(NULL);
+            perror("Błąd podczas oczekiwania na semafor");
+            pthread_exit(NULL);
         }
 
-        pid_t pid = fork();
-        printf("Fork result: %d, Current PID: %d, Parent PID: %d\n", pid, getpid(), getppid());
+        pid = fork();
 
-        if (terminate_customers) {
-                printf("Exiting child process due to termination flag\n");
-                safe_sem_post();
-                exit(0);
-        }
+        printf("FORK RESULT %d, parent pid :%d\n",getpid(),getppid());
+        if (pid == -1) {
+              printf("FORK RESULT w errorze %d, parent pid :%d\n",getpid(),getppid());
+            perror("fork failed");
+            safe_sem_post();  // Zwolnij semafor w przypadku błędu
+            printf("FORK RESULT %d, w error po sem post parent pid :%d\n",getpid(),getppid());
+            exit(1);
+        } else if (pid == 0) {
+              printf("FORK RESULT %d, w dziecku parent pid :%d\n",getpid(),getppid());
+            // if(get_fire_flag(shared_mem)==1){
+            //      printf("JESTEM TUTAJ %d",getpid());
+            // }
 
-        if (pid == 0) {
-            // Proces dziecka
-            printf("Child process details:\n");
-            printf("  Child PID: %d\n", getpid());
-            printf("  Parent PID: %d\n", getppid());
-
-            // Sprawdzanie flagi w procesie dziecka
-            // printf("PROCES %d SPRAWDZA CZY TERMINATED %d\n",getpid(), terminate_customers);
-            if (terminate_customers) {
-                printf("Exiting child process due to termination flag\n");
-                safe_sem_post();
-                exit(0);
-            }
-
-            // Uruchomienie procesu dziecka za pomocą execl
+              printf("FORK RESULT %d,przed exec parent pid :%d\n",getpid(),getppid());
+            // Proces klienta   
             if (execl("./src/customer", "customer", (char *)NULL) == -1) {
                 perror("Failed to execute customer program");
                 exit(1);
             }
-        } else if (pid < 0) {
-            // Błąd podczas forka
-            perror("Fork failed");
-            safe_sem_post();
-        }else{
-            if(terminate_customers){
-                exit(0);
-            }
-        }
-
-        // Sprawdzamy, czy sygnał zakończenia był aktywowany
-        if (terminate_customers) {
-            break; // Zakończymy tworzenie nowych klientów
-        }
-
-        // Losowy czas oczekiwania przed utworzeniem kolejnego klienta
-        int random_time = generate_random_time(MIN_TIME_TO_CLIENT, MAX_TIME_TO_CLIENT);
-    }
-
-    // Kończenie wątku po ustawieniu flagi
-    pthread_exit(NULL);
-}
-
-
-// // Obsługa sygnału zakończenia tworzenia klientów
-// void handle_customer_creating_signal_fire(int sig) {
-//     terminate_customers = 1;
-//     printf("Zatrzymano tworzenie nowych klientów po sygnale\n");
-//     pthread_exit(NULL);
-// }
-
-// void* create_customer_processes(void* arg) {
-//     signal(SIGUSR2, handle_customer_creating_signal_fire);
-
-//     while (!terminate_customers) {
-//         if (safe_sem_wait() == -1) {
-//             continue;
-//         }
-
-//         pid_t pid = fork();
-        
-//         // Detailed debugging
-//         printf("Fork result: %d, Current PID: %d, Parent PID: %d\n", 
-//                pid, getpid(), getppid());
-
-//         if (pid == 0) {
-//             // Child process
-//             printf("Child process details:\n");
-//             printf("  Child PID: %d\n", getpid());
-//             printf("  Parent PID: %d\n", getppid());
-//             printf("  Executable path: %s\n", "./src/customer");
-
-//             // Add absolute path debugging
-//             char current_dir[1024];
-//             if (getcwd(current_dir, sizeof(current_dir)) != NULL) {
-//                 printf("  Current working directory: %s\n", current_dir);
-//             }
-
-//             if (terminate_customers) {
-//                 printf("Exiting child process due to termination flag\n");
-//                 exit(0);
-//             }
-
-//             char* args[] = {"./src/customer", NULL};
-//             execvp(args[0], args);
-
-//             // Extensive error reporting
-//             perror("Failed to execute customer program");
-//             printf("Errno: %d\n", errno);
-//             exit(1);
-//         } else if (pid < 0) {
-//             perror("Fork failed");
-//             safe_sem_post();
-//         }
-//     }
-
-//     pthread_exit(NULL);
-// }
-
-void wait_for_customers() {
-
-    sem_t* customer_semaphore = get_semaphore_customer();
-
-    printf("Czekam na zakończenie wszystkich klientów...\n");
-
-    while (1) {
-        
-        pid_t finished_pid = wait(NULL); // Czekamy na dowolne dziecko
-        if (finished_pid > 0) {
-            decrement_customer_count(shared_mem);  // Aktualizujemy licznik klientów
-            sem_post(customer_semaphore);
-            printf("\t\tProces klienta %d zakończony. Pozostało klientów: %d\n", 
-                   finished_pid, get_customer_count(shared_mem));
+              printf("FORK RESULT %d,po exec parent pid :%d\n",getpid(),getppid());
+            exit(0);
+           
         } else {
-            if (errno == ECHILD) {
-                if (terminate_customers == 1 && get_customer_count(shared_mem) <= 0) {
-                        break;
-                }
-                continue;
-            } else {
-                perror("Błąd czekania na proces w wait_for_customers");
-                exit(1);
-            }
+
+            printf("w else FORK RESULT %d, parent pid :%d\n",getpid(),getppid());
+            // Mutex do ochrony tablicy PID-ów i zmiennej created_processes
+            pthread_mutex_lock(&pid_mutex);  // Blokujemy mutex przed modyfikacją
+            pids[created_processes] = pid;  // Zapisywanie PID procesu potomnego
+            created_processes++;  // Zwiększamy licznik procesów
+            pthread_mutex_unlock(&pid_mutex);  // Zwolnienie mutexu po modyfikacji
+
+            printf("FORK RESULT %d,PO WSZSTKIM parent pid :%d\n",getpid(),getppid());
+            
         }
 
-        // Jeśli flaga zakończenia pracy jest ustawiona i wszyscy klienci zakończyli
-        if (terminate_customers == 1 && get_customer_count(shared_mem) <= 0) {
-            break;
-        }
+          printf("FORK RESULT %d, parent pid :%d A TU TO NIE WIEM JZ\n",getpid(),getppid());
+        //  usleep(10);
     }
 
-    printf("KONIEC WAIT FOR CUSTOMER\n");
+    return NULL;
 }
+
 
 //inicjalizacja semafora dla klientów na MAX_CUSTOMER
 void init_semaphore_customer() {
@@ -210,36 +163,17 @@ void init_semaphore_customer() {
 int safe_sem_wait() {
     sem_t* semaphore = get_semaphore_customer(); 
 
-    // Logowanie prób czekania na semafor
-    log_semaphore_wait(getpid(), SEMAPHORE_NAME, "Czeka na semafor");
 
     while (sem_wait(semaphore) == -1) {
         if (errno == EINTR) {  // Obsługa przerwania przez sygnał
-            // Logowanie, gdy oczekiwanie na semafor jest przerwane
-            log_semaphore_wait(getpid(), SEMAPHORE_NAME, "Przerwano czekanie na semafor przez sygnał");
 
-            if (terminate_customers) {
-                log_semaphore_wait(getpid(), SEMAPHORE_NAME, "Flaga zakończenia ustawiona, kończymy czekanie na semafor");
-                return -1;
-            }
             continue;  // Jeśli przerwanie było inne, próbuj ponownie
         }
 
         // Logowanie błędu w przypadku innego problemu z semaforem
         perror("Błąd podczas oczekiwania na semafor");
-        log_semaphore_wait(getpid(), SEMAPHORE_NAME, "Błąd podczas oczekiwania na semafor");
         return -1;
     }
-
-    // Flaga sprawdzana po uzyskaniu semafora
-    if (terminate_customers) {
-        sem_post(semaphore); // Zwolnienie semafora, bo już go nie potrzebujemy
-        log_semaphore_wait(getpid(), SEMAPHORE_NAME, "Zwolniono semafor przed zakończeniem");
-        return -1;
-    }
-
-    // Logowanie uzyskania dostępu do semafora
-    log_semaphore_wait(getpid(), SEMAPHORE_NAME, "Uzyskano dostęp do semafora");
 
     return 0;  // Semafor uzyskany poprawnie
 }
@@ -247,24 +181,17 @@ int safe_sem_wait() {
 int safe_sem_post() {
     sem_t* semaphore = get_semaphore_customer();
 
-    // Logowanie próby zwolnienia semafora
-    log_semaphore_wait(getpid(), SEMAPHORE_NAME, "Zwalnianie semafora");
 
     while (sem_post(semaphore) == -1) {
         if (errno == EINTR) {  // Przerwanie przez sygnał
             // Logowanie próby ponownego zwolnienia semafora
-            log_semaphore_wait(getpid(), SEMAPHORE_NAME, "Przerwano zwalnianie semafora przez sygnał");
             continue;  // Spróbuj ponownie
         } else {
             // Logowanie błędu, jeśli semafor nie może zostać zwolniony
             perror("Błąd podczas zwalniania semafora");
-            log_semaphore_wait(getpid(), SEMAPHORE_NAME, "Błąd podczas zwalniania semafora");
             return -1;
         }
     }
-
-    // Logowanie zwolnienia semafora
-    log_semaphore_wait(getpid(), SEMAPHORE_NAME, "Semafor zwolniony");
 
     return 0;  // Semafor zwolniony pomyślnie
 }
@@ -282,8 +209,6 @@ int generate_random_time(float min_seconds, float max_seconds) {
     int min_milliseconds = (int)(min_seconds * 1000);  // 1 sekunda = 1000 milisekund
     int max_milliseconds = (int)(max_seconds * 1000);  // 1 sekunda = 1000 milisekund
 
-    printf("min time: %d ms\n", min_milliseconds);
-    printf("max time: %d ms\n", max_milliseconds);
 
     // Losowy czas w milisekundach
     int random_milliseconds = (rand() % (max_milliseconds - min_milliseconds + 1)) + min_milliseconds;

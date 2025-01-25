@@ -9,6 +9,7 @@
 #include "cashier.h"
 #include "shared_memory.h"
 #include "manager_cashiers.h"
+#include "creator_customer.h"
 #include "customer.h"
 // #include "main.h" //Dla zmiennych długości obsługi przez kasjera
 
@@ -18,17 +19,6 @@ extern int current_cashiers;
 
 pthread_key_t cashier_thread_key;// Klucz dla danych kasjera w pamięci specyficznej dla wątku
 volatile int terminate_flags[MAX_CASHIERS] = {0};  //Flagi dla kasjerów których usuwamy
-
-// void block_signals_in_thread() {
-//     sigset_t set;
-//     sigemptyset(&set);
-//     sigaddset(&set, SIGINT);  // Dodanie SIGINT do zestawu blokowanych sygnałów
-//     if (pthread_sigmask(SIG_BLOCK, &set, NULL) != 0) {
-//         perror("Błąd podczas blokowania sygnałów w wątku");
-//         exit(1);
-//     }
-// }
-
 
 
 //inicjalizacja klucza który trzyma cashier_id dla wątku
@@ -73,9 +63,28 @@ void create_cashier(pthread_t* cashier_thread, int* cashier_id) {
     printf("Kasjer %d został uruchomiony.\n", *cashier_id);
 }
 
+
+void block_signal_SIGTERM() {
+    // Tworzenie maski sygnałów
+    sigset_t block_set;
+    sigemptyset(&block_set);            // Tworzenie pustej maski
+    sigaddset(&block_set, SIGTERM);      // Dodanie SIGINT do maski
+
+    // Blokowanie sygnału SIGINT w tym wątku
+    if (pthread_sigmask(SIG_BLOCK, &block_set, NULL) != 0) {
+        perror("Nie udało się zablokować SIGTERM w wątku");
+        pthread_exit(NULL);
+    }
+
+    printf("SIGTERM został zablokowany w tym wątku.\n");
+}
+
+
 void* cashier_function(void* arg) {
 
     srand(time(NULL));
+    // block_signal_SIGTERM();
+    // block_signal_SIGINT();
     int cashier_id = *((int*)arg);  //pobranie cashier_id z argumentów
 
     // Przypisanie ID kasjera do wątku
@@ -196,10 +205,10 @@ void handle_cashier_signal_fire(int sig) {
         fprintf(stderr, "Błąd: Brak przypisanego ID kasjera do wątku\n");
         exit(1); 
     }
-    // Zapisz czas początkowy
+    // // Zapisz czas początkowy
     while (get_customer_count(shared_mem) > 0) {
-        // printf("Pozostali klienci w sklepie %d \n",get_customer_count(shared_mem));
-        fflush(stdin);
+        printf("Pozostali klienci w sklepie %d \n",get_customer_count(shared_mem));
+        // fflush(stdin);
         // Czekaj, aż wszyscy klienci wyjdą
         // sleep(1);  // Oczekiwanie przez 1 sekundę
     }
@@ -223,6 +232,8 @@ void wait_for_cashiers(pthread_t* cashier_threads, int num_cashiers) {
                 // Obsługuje błąd w przypadku niepowodzenia w oczekiwaniu na wątek
                 fprintf(stderr, "Błąd podczas oczekiwania na wątek kasjera %d: %d\n", i+1, ret);
             }
+        }else{
+            printf("NIE ZAINICJALIZOWANY WATEK\n");
         }
     }
     printf("Kasjerzy wyszli\n");
@@ -230,7 +241,6 @@ void wait_for_cashiers(pthread_t* cashier_threads, int num_cashiers) {
 
 //czyszczenie kolejki komunikatów dla danego kasjera
 void cleanup_queue(int cashier_id) {
-    printf("CZYSZCZENIE KOLEJKI %d",cashier_id);
     int queue_id = get_queue_id(shared_mem, cashier_id);
 
     if (queue_id == -1) {
@@ -241,7 +251,6 @@ void cleanup_queue(int cashier_id) {
     } else {
         set_queue_id(shared_mem, cashier_id, -1);  // Zaktualizowanie pamięci dzielonej: ustawienie kolejki na -1
     }
-    printf("WYCZYSZCZONA KOLEJKI %d",cashier_id);
 }
 
 //usuwanie wszystkich kolejek komunikatów (Wywoływane z poziomu manadzera);

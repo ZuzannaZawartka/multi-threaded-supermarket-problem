@@ -23,8 +23,6 @@ extern pthread_mutex_t customers_mutex;
 extern pthread_cond_t customers_cond;
 
 
-
-
 void send_signal_to_cashiers(int signal) {
     int sum_cash = get_current_cashiers();
     for (int i = 0; i < sum_cash; i++) {
@@ -37,8 +35,10 @@ void send_signal_to_cashiers(int signal) {
 }
 
 // Wyyłamy sygnał SIGHUP do kasjerów, aby ci zakończyli swoją pracę
-void fire_sigTermHandler(int signum) {   
+void fire_sigTermHandler(int signum) {  
+    printf("MAMY SYGNAL\n"); 
     send_signal_to_cashiers(SIGHUP); //wysyłamy sygnał
+    printf("OBECNIE KASJEROW JEST %d\n", get_current_cashiers());
     wait_for_cashiers(cashier_threads, get_current_cashiers()); //czekamy na zakończenie 
     // while (get_current_cashiers()>0){
     //     printf("czekamy na kasjerow %d\n",get_current_cashiers());
@@ -66,7 +66,7 @@ void* manage_customers(void* arg) {
         if (required_cashiers < MIN_CASHIERS) {
             required_cashiers = MIN_CASHIERS;
         }
-        // //             // Dodaj nowych kasjerów
+        // // //             // Dodaj nowych kasjerów
         while ( get_current_cashiers() < required_cashiers && get_current_cashiers() < MAX_CASHIERS) {
             printf("aktywny uzytkownicy %d\n", get_active_cashiers(shared_mem));
                     printf("DODAWANIE KASJERA\n");
@@ -82,31 +82,29 @@ void* manage_customers(void* arg) {
 
                     printf("\033[1;32m[KASJER %d] OTWIERANIE, Obecny zakres kasjerów : 1 - %d\033[0m\n\n", get_current_cashiers(), get_active_cashiers(shared_mem));
         }
-        //             // Zmniejsz liczbę kasjerów
-        //     printf("PRZED USUWANIEM KASJERA\n");
-        //    while (get_customer_count(shared_mem)  < MIN_PEOPLE_FOR_CASHIER * ( get_current_cashiers()  - 1) &&  get_current_cashiers() > MIN_CASHIERS) {
-        //         printf("USUWANIE     KASJERA\n");
-        //             decrement_active_cashiers(shared_mem);
-        //             printf("aktywny uzytkownicy %d\n", get_active_cashiers(shared_mem));
-        //             int cashier_to_remove =  get_current_cashiers() ; 
-        //             pthread_t cashier_thread = get_cashier_thread(cashier_threads, cashier_to_remove - 1);
 
-        //             printf("\033[38;5;196m[KASJER %d] już nie przyjmuje więcej klientów - Wątek: %ld\033[0m\n", cashier_to_remove, cashier_thread);
-        //             fflush(stdin);
-        //             if (pthread_kill(cashier_thread, SIGUSR1) != 0) {
-        //                 perror("Błąd podczas wysyłania sygnału do kasjera");
-        //                 continue;
-        //             }
-        //             printf("OCZEKIWANIE NA KASJERA AZ ZAMKNIE\n");
-        //             void* status = NULL;
-        //             int ret = pthread_join(cashier_thread, &status);
-        //             if (ret == 0) {
-        //                 printf("\033[38;5;196m[KAJSER %d] kasa już zakończyła pracę , kod zakończenia: %ld\033[0m\n", cashier_to_remove, (long)status);
-        //             } else {
-        //                 perror("Błąd podczas oczekiwania na zakończenie wątku kasjera");
-        //             }
-        //             decrement_cashiers();
-        //      }
+           while (get_customer_count(shared_mem)  < MIN_PEOPLE_FOR_CASHIER * ( get_current_cashiers()  - 1) &&  get_current_cashiers() > MIN_CASHIERS) {
+                printf("USUWANIE     KASJERA\n");
+                    decrement_active_cashiers(shared_mem);
+                    printf("aktywny uzytkownicy %d\n", get_active_cashiers(shared_mem));
+                    int cashier_to_remove =  get_current_cashiers() ; 
+                    pthread_t cashier_thread = get_cashier_thread(cashier_threads, cashier_to_remove - 1);
+
+                    printf("\033[38;5;196m[KASJER %d] już nie przyjmuje więcej klientów - Wątek: %ld\033[0m\n", cashier_to_remove, cashier_thread);
+                    if (pthread_kill(cashier_thread, SIGUSR1) != 0) {
+                        perror("Błąd podczas wysyłania sygnału do kasjera");
+                        continue;
+                    }
+                    printf("OCZEKIWANIE NA KASJERA AZ ZAMKNIE\n");
+                    void* status = NULL;
+                    int ret = pthread_join(cashier_thread, &status);
+                    if (ret == 0) {
+                        printf("\033[38;5;196m[KAJSER %d] kasa już zakończyła pracę , kod zakończenia: %ld\033[0m\n", cashier_to_remove, (long)status);
+                    } else {
+                        perror("Błąd podczas oczekiwania na zakończenie wątku kasjera");
+                    }
+                    decrement_cashiers();
+             }
 
       }
     return NULL;
@@ -123,6 +121,7 @@ void create_initial_cashiers(pthread_t* cashier_threads, int* cashier_ids) {
         set_cashier_thread(cashier_threads, i, cashier_thread);  // Ustawiamy wątek kasjera w tablicy (funkcja z mutexem)
 
         increment_cashiers();  // Zwiększamy liczbę kasjerów
+        printf("KASJER teraz %d\n",get_current_cashiers());
         increment_active_cashiers(shared_mem);
     }
     printf("Utworzono minimalną liczbę kasjerów: %d\n", MIN_CASHIERS);

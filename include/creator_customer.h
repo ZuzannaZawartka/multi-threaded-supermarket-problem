@@ -14,7 +14,7 @@ typedef struct {
 } CustomerData;
 
 
-void* create_customer_processes(void* arg);          // Creates customer processes
+void* create_customer_processes(void* arg) ;        // Creates customer processes
 void wait_for_customers();                           // Wait for all customer processes to finish
 void terminate_all_customers();                      // Terminate all customer processes
 
@@ -29,6 +29,8 @@ int generate_random_time(float min_seconds, float max_seconds);  // Generate ran
 void handle_customer_creating_signal_fire(int sig);  // Handle signal to stop creating customers
 
 void log_semaphore_wait(pid_t pid, const char* semaphore_name, const char* message);  // Log semaphore actions
+void* cleanup_processes(void* arg);
 
+void block_signal_SIGINT();
 
 #endif // CREATOR_CUSTOMER_H
