@@ -20,13 +20,9 @@ int cashier_ids[MAX_CASHIERS];
 int current_cashiers = 0;  // Liczba kasjerów działających
 int terminate_flags[MAX_CASHIERS] = {0};  //Flagi dla kasjerów których usuwamy
 
-extern pthread_mutex_t customers_mutex;
-extern pthread_cond_t customers_cond;
-
-
-
-
 void send_signal_to_cashiers(int signal) {
+    printf("COS OSOSOS\n");
+    printf("ILOSC  KASJEROW TO %d\n",get_current_cashiers());
     int sum_cash = get_current_cashiers();
     printf("wysylanie do kasjerow %d\n\n",sum_cash);
     for (int i = 0; i < sum_cash; i++) {
@@ -40,21 +36,13 @@ void send_signal_to_cashiers(int signal) {
 
 // Wyyłamy sygnał SIGHUP do kasjerów, aby ci zakończyli swoją pracę
 void fire_sigTermHandler(int signum) {  
-    printf("MAMY SYGNAL\n"); 
-    send_signal_to_cashiers(SIGHUP); //wysyłamy sygnał
-    printf("OBECNIE KASJEROW JEST %d\n", get_current_cashiers());
-    wait_for_cashiers(cashier_threads, get_current_cashiers()); //czekamy na zakończenie 
-    // while (get_current_cashiers()>0){
-    //     printf("czekamy na kasjerow %d\n",get_current_cashiers());
-    //     // usleep(10000);
-    // }
-    cleanAfterCashiers();  // Sprzątanie po kasjerach kolejek komunikatów
+    printf("MAMY SYGNAL\n");
     printf("KONIEC MANADZERA\n");
     pthread_exit(NULL);  // Kasjer kończy pracę
 }
 
 void* manage_customers(void* arg) {
-    if (signal(SIGALRM, fire_sigTermHandler) == SIG_ERR) {//łapanie sygnału o pożarze
+    if (signal(SIGTERM, fire_sigTermHandler) == SIG_ERR) {//łapanie sygnału o pożarze
         perror("Błąd przy ustawianiu handlera dla SIGTERM");
         exit(1); 
     } 
@@ -153,7 +141,7 @@ void init_manager(pthread_t* manager_thread) {
 
 // Czekanie na zakończenie wątku menedżera
 void wait_for_manager(pthread_t manager_thread) { 
-    printf("CZEKAM NA WATEK\n");
+    printf("Ilosc kasjerow %d\n",get_current_cashiers());
     // Czekamy na zakończenie wątku menedżera
     int ret = pthread_join(manager_thread, NULL);
     if (ret != 0) {
@@ -162,15 +150,20 @@ void wait_for_manager(pthread_t manager_thread) {
     }
 
     printf("KOniec waku manadzera\n");
-    // Próba zniszczenia mutexa
-    ret = pthread_mutex_destroy(&mutex);
-    if (ret != 0) {
-        fprintf(stderr, "Błąd podczas niszczenia mutexa\n");
-        exit(1);  // Zakończenie programu w przypadku błędu
-    }
 
     printf("Menadżer zakończył działanie.\n");
     //  fflush(stdout);
+}
+
+void destroy_mutex(){
+        // Próba zniszczenia mutexa
+    int ret = pthread_mutex_destroy(&mutex);
+    if (ret != 0) {
+        fprintf(stderr, "Błąd podczas niszczenia mutexa\n");
+        exit(1);  // Zakończenie programu w przypadku błędu
+    }else{
+        printf("Semafor pid_mutex poprawnie usuniety\n");
+    }
 }
 
 //zwiększanie liczby kasjerów z mutexem

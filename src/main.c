@@ -8,6 +8,7 @@
 #include "shared_memory.h"
 #include "manager_cashiers.h"
 #include "firefighter.h"
+#include "cashier.h"
 
 SharedMemory* shared_mem = NULL;
 pthread_t monitor_thread;  // Declare it as a global variable
@@ -21,28 +22,24 @@ extern int created_processes ; // Licznik stworzonych procesów
 
 void mainHandlerProcess(int signum) {
 
-    // if(get_fire_flag(shared_mem)==1){
-    //     return;
-    // }
-
     set_fire_flag(shared_mem,1); 
 
+    countdown_to_exit();
+
     // Wyślij sygnał do całej grupy procesów
-
-    printf("WYSLANIE SYGNALOW DO MANADZERA KASJERA\n");
-
-    send_signal_to_manager(SIGALRM);  // Wysyłanie sygnału do wątku menedżera
-
+    
+    // wait_for_firefighter(firefighter_thread);//usunięcie strażaka
+    send_signal_to_cashiers(SIGHUP); //wysyłamy sygnał
+    send_signal_to_manager(SIGTERM);  // Wysyłanie sygnału do wątku menedżera
     // send_signal_to_customers(SIGUSR2);  // Wysyłanie sygnału do klientów
 
-    countdown_to_exit();
+ 
 
     // send_signal_to_firefighter(SIGQUIT); //wysylanie sygnału do strażaka
 
 }
 
 int main() {
-    printf("MAIN WYWOLANY \n");
     srand(time(NULL));  
     init_semaphore_customer();
     shared_mem = init_shared_memory();
@@ -81,53 +78,42 @@ int main() {
             }
         } else {
             if (get_fire_flag(shared_mem)) {  // Sprawdź, czy proces ma się zakończyć
-            printf("Proces został utworzony po aktywacji pożaru. Zabijanie PID: %d\n", pid);
-            printf(".........................KILLER\n");
-            kill(pid, SIGTERM);
+            kill(pid, SIGKILL);
             }else{
-       // Parent process: Track the child PID
-            pthread_mutex_lock(&pid_mutex);
-            pids[created_processes++] = pid;  // Save the child PID
-            pthread_mutex_unlock(&pid_mutex);
+                pthread_mutex_lock(&pid_mutex);
+                pids[created_processes++] = pid;  // Save the child PID
+                pthread_mutex_unlock(&pid_mutex);
             }
      
         }
+        // usleep(1000000);  // Opóźnienie przed kolejnym sprawdzeniem zakończonych procesów
     }
 
-
-    //     // Tworzymy wątek do generowania procesów klientów
-    // if (pthread_create(&customer_thread, NULL, create_customer_processes, NULL) != 0) {
-    //     perror("Błąd przy tworzeniu wątku klientów");
-    //     exit(1);
-    // }
-
-    // printf("CZEKAMY NA MENEDŻERA\n");
-    // pthread_join(customer_thread, NULL);
-    
-    printf("CZEKAMY NA CZYSZCZENIE\n");
     pthread_join(cleanup_thread, NULL);
 
-    printf("czekamy na manago:)\n");
+    wait_for_cashiers(&customer_thread); //czekamy na zakończenie 
+
+    cleanAfterCashiers();  // Sprzątanie po kasjerach kolejek komunikatów
+
     wait_for_manager(monitor_thread); //usuniecie manadżera
-
-    // wait_for_firefighter(firefighter_thread);//usunięcie strażaka
-
-
+   
     cleanup_shared_memory(shared_mem); //czyszczenie pamięci dzielonej i jej semafora
     destroy_semaphore_customer();
+    destroy_mutex();
+    destroy_pid_mutex();
     printf("KONIEC\n");
     return 0;
 }
 
 void send_signal_to_manager(int signal) {
-    printf("SYGNAL MANADZER\n");
     if (pthread_kill(monitor_thread, signal) != 0) {
             perror("Błąd wysyłania sygnału do kasjera");
+    }else {
+    printf("Sygnał wysłany do kasjera\n");
     }
 }
 
 void send_signal_to_customers(int signal) {
-    printf("SYGNAL DO KLIENTOW ZEBY PRZESTALI\n");
     if (pthread_kill(customer_thread, signal) != 0) {
             perror("Błąd wysyłania sygnału do kasjera");
     }

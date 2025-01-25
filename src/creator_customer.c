@@ -17,34 +17,28 @@
 #define SEMAPHORE_NAME "/customer_semaphore"
 
 
-
-
 pthread_mutex_t pid_mutex = PTHREAD_MUTEX_INITIALIZER;  // Mutex dla ochrony tablicy PID-ów
 pid_t pids[MAX_CUSTOMERS];  // Tablica przechowująca PIDs procesów potomnych
 int created_processes = 0;  // Licznik stworzonych procesów
 
 extern SharedMemory* shared_mem;  // Dostęp do pamięci dzielonej
 
-void block_signal_SIGINT() {
-    // Tworzenie maski sygnałów
-    sigset_t block_set;
-    sigemptyset(&block_set);            // Tworzenie pustej maski
-    sigaddset(&block_set, SIGINT);      // Dodanie SIGINT do maski
 
-    // Blokowanie sygnału SIGINT w tym wątku
-    if (pthread_sigmask(SIG_BLOCK, &block_set, NULL) != 0) {
-        perror("Nie udało się zablokować SIGINT w wątku");
-        pthread_exit(NULL);
+
+void destroy_pid_mutex(){
+        // Próba zniszczenia mutexa
+    int ret = pthread_mutex_destroy(&pid_mutex);
+    if (ret != 0) {
+        fprintf(stderr, "Błąd podczas niszczenia mutexa\n");
+        exit(1);  // Zakończenie programu w przypadku błędu
+    }else{
+        printf("Semafor pid_mutex poprawnie usuniety\n");
     }
-
-    printf("SIGINT został zablokowany w tym wątku.\n");
 }
-
 
 void* cleanup_processes(void* arg) {
 
     // block_signal_SIGINT();
-
 
     int status;
     pid_t finished_pid;
@@ -71,93 +65,28 @@ void* cleanup_processes(void* arg) {
                 created_processes--;  // Zmniejszamy licznik procesów
                 decrement_customer_count(shared_mem);  // Aktualizujemy licznik klientów
                 safe_sem_post();
-                i--;  // Adjust index to check next process in position
+                i--;  
             }
         }
 
-           // Terminate any remaining processes forcefully after a timeout
+
         if (get_fire_flag(shared_mem)) {
             for (int i = 0; i < created_processes; i++) {
-                printf("Forcefully killing process %d\n", pids[i]);
+                         decrement_customer_count(shared_mem);  // Aktualizujemy licznik klientów
+                safe_sem_post();
                 kill(pids[i], SIGTERM);
             }
-            created_processes = 0;  // Clear all processes
+            created_processes = 0; 
         }
 
         pthread_mutex_unlock(&pid_mutex);  // Zwolnienie mutexu po modyfikacji
-    // usleep(100000);  // Opóźnienie przed kolejnym sprawdzeniem zakończonych procesów
+     
     }
 
     printf("Koniec czyszczenia procesów.\n");
     return NULL;
 }
 
-
-void* create_customer_processes(void* arg) {
-    pid_t pid;
-
-    
-    // Sprawdzamy, czy mamy wystarczającą liczbę kasjerów
-    while (get_active_cashiers(shared_mem) < MIN_CASHIERS) {
-        // sleep(1);
-    }
-
-    while (get_fire_flag(shared_mem)!=1) {
-        if (safe_sem_wait() == -1) {
-            perror("Błąd podczas oczekiwania na semafor");
-            pthread_exit(NULL);
-        }
-
-        pid = fork();
-
-        // printf("FORK RESULT %d, parent pid :%d\n",getpid(),getppid());
-        if (pid <0) {
-            //   printf("FORK RESULT w errorze %d, parent pid :%d\n",getpid(),getppid());
-            perror("fork failed");
-            safe_sem_post();  // Zwolnij semafor w przypadku błędu
-            // printf("FORK RESULT %d, w error po sem post parent pid :%d\n",getpid(),getppid());
-            pthread_exit(NULL);
-        } else if (pid == 0) {
-            //   printf("FORK RESULT %d, w dziecku parent pid :%d\n",getpid(),getppid());
-
-            // Mutex do ochrony tablicy PID-ów i zmiennej created_processes
-           
-            //   printf("FORK RESULT %d,przed exec parent pid :%d\n",getpid(),getppid());
-            // Proces klienta   
-            if (execl("./src/customer", "customer", (char *)NULL) == -1) {
-                perror("Failed to execute customer program");
-                 pthread_exit(NULL);
-            }
-            //   printf("FORK RESULT %d,po exec parent pid :%d\n",getpid(),getppid());
-           
-        } else {
-
-
-             pthread_mutex_lock(&pid_mutex);  // Blokujemy mutex przed modyfikacją
-            pids[created_processes] = pid;  // Zapisywanie PID procesu potomnego
-            created_processes++;  // Zwiększamy licznik procesów
-            pthread_mutex_unlock(&pid_mutex);  // Zwolnienie mutexu po modyfikacji
-            // printf("w else FORK RESULT %d, parent pid :%d\n",getpid(),getppid());
-
-
-            // printf("FORK RESULT %d,PO WSZSTKIM parent pid :%d\n",getpid(),getppid());
-
-            // if(get_fire_flag(shared_mem)==1){
-            //     printf("ZABITY PROCES PO WSZYTSKIM %d\n", getpid());
-            //     exit(0);
-            // }
-            
-        }
-
-        //   printf("FORK RESULT %d, parent pid :%d A TU TO NIE WIEM JZ\n",getpid(),getppid());
-    //       int min_time = 200000;  // 0.5 sekundy w mikrosekundach
-    // int max_time = 800000; // 1 sekunda w mikrosekundach
-    // int random_time = min_time + rand() % (max_time - min_time + 1);
-    // usleep(random_time);
-    }
-
-    return NULL;
-}
 
 
 //inicjalizacja semafora dla klientów na MAX_CUSTOMER

@@ -14,7 +14,6 @@ typedef struct {
 } CustomerData;
 
 
-void* create_customer_processes(void* arg) ;        // Creates customer processes
 void wait_for_customers();                           // Wait for all customer processes to finish
 void terminate_all_customers();                      // Terminate all customer processes
 
@@ -32,5 +31,7 @@ void log_semaphore_wait(pid_t pid, const char* semaphore_name, const char* messa
 void* cleanup_processes(void* arg);
 
 void block_signal_SIGINT();
+
+void destroy_pid_mutex();
 
 #endif // CREATOR_CUSTOMER_H

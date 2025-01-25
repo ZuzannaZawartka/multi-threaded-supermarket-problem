@@ -28,11 +28,11 @@ void customer_function() {
     printf("utworzenie sie klienta %d\n", getpid());
     shared_mem = get_shared_memory();
 
-    if(get_fire_flag(shared_mem)==1){
+    // if(get_fire_flag(shared_mem)==1){
 
-        printf("XZABITU W KLIENICE %d\n",getpid());
-        exit(0);
-    }
+    //     printf("XZABITU W KLIENICE %d\n",getpid());
+    //     exit(0);
+    // }
     // block_signal_SIGTERM();
 
   

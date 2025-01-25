@@ -35,4 +35,6 @@ int* get_cashier_id_pointer(int* cashier_ids, int index);
 int get_message_count_for_cashier(int queue_id);
 int select_cashier_with_fewest_people(SharedMemory* shared_mem) ;
 
+void destroy_mutex();
+
 #endif

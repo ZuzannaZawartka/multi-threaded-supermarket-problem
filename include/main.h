@@ -4,7 +4,7 @@
 #define MIN_PEOPLE_FOR_CASHIER 2  // Na każdą grupę 5 klientów przypada jeden kasjer
 #define MAX_CASHIERS 10 //maksymalna liczba kasjerów
 #define MIN_CASHIERS 2 //minimalna liczba kasjerów
-#define MAX_CUSTOMERS 100// Maksymalna liczba klientów
+#define MAX_CUSTOMERS 10// Maksymalna liczba klientów
 
 #define MIN_TIME_TO_CLIENT 0 //czas co jaki generuja sie klienci (Kasjer sprawdza stan klientów co 0.5 sekundy)
 #define MAX_TIME_TO_CLIENT 0
