@@ -22,17 +22,21 @@ extern int created_processes ; // Licznik stworzonych procesów
 
 void mainHandlerProcess(int signum) {
 
+    if(get_fire_flag(shared_mem)==1){
+        return;
+    }
+
     set_fire_flag(shared_mem,1); 
 
     countdown_to_exit();
 
     // Wyślij sygnał do całej grupy procesów
-    
+
     // wait_for_firefighter(firefighter_thread);//usunięcie strażaka
     send_signal_to_cashiers(SIGHUP); //wysyłamy sygnał
-    send_signal_to_manager(SIGTERM);  // Wysyłanie sygnału do wątku menedżera
+    // send_signal_to_manager(SIGTERM);  // Wysyłanie sygnału do wątku menedżera
     // send_signal_to_customers(SIGUSR2);  // Wysyłanie sygnału do klientów
-
+   
  
 
     // send_signal_to_firefighter(SIGQUIT); //wysylanie sygnału do strażaka
@@ -86,16 +90,18 @@ int main() {
             }
      
         }
-        // usleep(1000000);  // Opóźnienie przed kolejnym sprawdzeniem zakończonych procesów
+        // usleep(500000);  // Opóźnienie przed kolejnym sprawdzeniem zakończonych procesów
     }
 
     pthread_join(cleanup_thread, NULL);
 
+    wait_for_manager(monitor_thread); //usuniecie manadżera
+
     wait_for_cashiers(&customer_thread); //czekamy na zakończenie 
 
+   
     cleanAfterCashiers();  // Sprzątanie po kasjerach kolejek komunikatów
 
-    wait_for_manager(monitor_thread); //usuniecie manadżera
    
     cleanup_shared_memory(shared_mem); //czyszczenie pamięci dzielonej i jej semafora
     destroy_semaphore_customer();
@@ -108,8 +114,6 @@ int main() {
 void send_signal_to_manager(int signal) {
     if (pthread_kill(monitor_thread, signal) != 0) {
             perror("Błąd wysyłania sygnału do kasjera");
-    }else {
-    printf("Sygnał wysłany do kasjera\n");
     }
 }
 

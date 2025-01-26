@@ -21,12 +21,8 @@ int current_cashiers = 0;  // Liczba kasjerów działających
 int terminate_flags[MAX_CASHIERS] = {0};  //Flagi dla kasjerów których usuwamy
 
 void send_signal_to_cashiers(int signal) {
-    printf("COS OSOSOS\n");
-    printf("ILOSC  KASJEROW TO %d\n",get_current_cashiers());
     int sum_cash = get_current_cashiers();
-    printf("wysylanie do kasjerow %d\n\n",sum_cash);
     for (int i = 0; i < sum_cash; i++) {
-        printf("wysylanie kasjerowi %d",i);
         pthread_t cashier_thread = get_cashier_thread(cashier_threads, i); 
         if (pthread_kill(cashier_thread, signal) != 0) {   //wysylamy sygnal do kasjera aby zakończył pracę
             perror("Error sending signal to cashier thread");
@@ -34,18 +30,16 @@ void send_signal_to_cashiers(int signal) {
     }
 }
 
-// Wyyłamy sygnał SIGHUP do kasjerów, aby ci zakończyli swoją pracę
-void fire_sigTermHandler(int signum) {  
-    printf("MAMY SYGNAL\n");
-    printf("KONIEC MANADZERA\n");
-    pthread_exit(NULL);  // Kasjer kończy pracę
-}
+// // Wyyłamy sygnał SIGHUP do kasjerów, aby ci zakończyli swoją pracę
+// void fire_sigTermHandler(int signum) {  
+//     pthread_exit(NULL);  // Kasjer kończy pracę
+// }
 
 void* manage_customers(void* arg) {
-    if (signal(SIGTERM, fire_sigTermHandler) == SIG_ERR) {//łapanie sygnału o pożarze
-        perror("Błąd przy ustawianiu handlera dla SIGTERM");
-        exit(1); 
-    } 
+    // if (signal(SIGTERM, fire_sigTermHandler) == SIG_ERR) {//łapanie sygnału o pożarze
+    //     perror("Błąd przy ustawianiu handlera dla SIGTERM");
+    //     exit(1); 
+    // } 
     create_initial_cashiers(cashier_threads, cashier_ids);
 
     while (!get_fire_flag(shared_mem)) {
@@ -58,57 +52,57 @@ void* manage_customers(void* arg) {
         if (required_cashiers < MIN_CASHIERS) {
             required_cashiers = MIN_CASHIERS;
         }
-        // // //             // Dodaj nowych kasjerów
-        while ( get_current_cashiers() < required_cashiers && get_current_cashiers() < MAX_CASHIERS) {
-            printf("aktywny uzytkownicy %d\n", get_active_cashiers(shared_mem));
-                    printf("DODAWANIE KASJERA\n");
-                    int new_cashier_id = get_current_cashiers() + 1;
-                    set_cashier_id(cashier_ids, get_current_cashiers(), new_cashier_id);
+        // // // //             // Dodaj nowych kasjerów
+        // while ( get_current_cashiers() < required_cashiers && get_current_cashiers() < MAX_CASHIERS && !get_fire_flag(shared_mem)) {
+        //     printf("aktywny uzytkownicy %d\n", get_active_cashiers(shared_mem));
+        //             printf("DODAWANIE KASJERA\n");
+        //             int new_cashier_id = get_current_cashiers() + 1;
+        //             set_cashier_id(cashier_ids, get_current_cashiers(), new_cashier_id);
 
-                    pthread_t cashier_thread;
-                    create_cashier(&cashier_thread, &cashier_ids[get_current_cashiers()]);
-                    set_cashier_thread(cashier_threads, get_current_cashiers(), cashier_thread);
+        //             pthread_t cashier_thread;
+        //             create_cashier(&cashier_thread, &cashier_ids[get_current_cashiers()]);
+        //             set_cashier_thread(cashier_threads, get_current_cashiers(), cashier_thread);
 
-                    increment_cashiers();
-                    increment_active_cashiers(shared_mem);
+        //             increment_cashiers();
+        //             increment_active_cashiers(shared_mem);
 
-                    printf("\033[1;32m[KASJER %d] OTWIERANIE, Obecny zakres kasjerów : 1 - %d\033[0m\n\n", get_current_cashiers(), get_active_cashiers(shared_mem));
-        }
+        //             printf("\033[1;32m[KASJER %d] OTWIERANIE, Obecny zakres kasjerów : 1 - %d\033[0m\n\n", get_current_cashiers(), get_active_cashiers(shared_mem));
+        // }
 
-           while (get_customer_count(shared_mem)  < MIN_PEOPLE_FOR_CASHIER * ( get_current_cashiers()  - 1) &&  get_current_cashiers() > MIN_CASHIERS) {
-                printf("USUWANIE     KASJERA\n");
-                    decrement_active_cashiers(shared_mem);
-                    printf("aktywny uzytkownicy %d\n", get_active_cashiers(shared_mem));
-                    int cashier_to_remove =  get_current_cashiers() ; 
-                    pthread_t cashier_thread = get_cashier_thread(cashier_threads, cashier_to_remove - 1);
-                     int ret = pthread_mutex_lock(&mutex);
-                    if (ret != 0) {
-                        perror("Błąd podczas blokowania mutexa w closeCashier");
-                        pthread_exit(NULL);
-                    }
-                    printf("pobieranie klucza\n \n");
-                    terminate_flags[cashier_to_remove - 1]=1;
-                    ret = pthread_mutex_unlock(&mutex);
-                    if (ret != 0) {
-                        perror("Błąd podczas zwalniania mutexa w closeCashier");
-                         pthread_exit(NULL);
-                    }
+        //    while (get_customer_count(shared_mem)  < MIN_PEOPLE_FOR_CASHIER * ( get_current_cashiers()  - 1) &&  get_current_cashiers() > MIN_CASHIERS && !get_fire_flag(shared_mem)) {
+        //         printf("USUWANIE     KASJERA\n");
+        //             decrement_active_cashiers(shared_mem);
+        //             printf("aktywny uzytkownicy %d\n", get_active_cashiers(shared_mem));
+        //             int cashier_to_remove =  get_current_cashiers() ; 
+        //             pthread_t cashier_thread = get_cashier_thread(cashier_threads, cashier_to_remove - 1);
+        //              int ret = pthread_mutex_lock(&mutex);
+        //             if (ret != 0) {
+        //                 perror("Błąd podczas blokowania mutexa w closeCashier");
+        //                 pthread_exit(NULL);
+        //             }
+        //             printf("pobieranie klucza\n \n");
+        //             terminate_flags[cashier_to_remove - 1]=1;
+        //             ret = pthread_mutex_unlock(&mutex);
+        //             if (ret != 0) {
+        //                 perror("Błąd podczas zwalniania mutexa w closeCashier");
+        //                  pthread_exit(NULL);
+        //             }
 
-                    printf("\033[38;5;196m[KASJER %d] już nie przyjmuje więcej klientów - Wątek: %ld\033[0m\n", cashier_to_remove, cashier_thread);
-                    // if (pthread_kill(cashier_thread, SIGUSR1) != 0) {
-                    //     perror("Błąd podczas wysyłania sygnału do kasjera");
-                    //     continue;
-                    // }
-                    printf("OCZEKIWANIE NA KASJERA AZ ZAMKNIE\n");
-                    void* status = NULL;
-                    int ret2 = pthread_join(cashier_thread, &status);
-                    if (ret2 == 0) {
-                        printf("\033[38;5;196m[KAJSER %d] kasa już zakończyła pracę , kod zakończenia: %ld\033[0m\n", cashier_to_remove, (long)status);
-                    } else {
-                        perror("Błąd podczas oczekiwania na zakończenie wątku kasjera");
-                    }
-                    decrement_cashiers();
-             }
+        //             printf("\033[38;5;196m[KASJER %d] już nie przyjmuje więcej klientów - Wątek: %ld\033[0m\n", cashier_to_remove, cashier_thread);
+        //             // if (pthread_kill(cashier_thread, SIGUSR1) != 0) {
+        //             //     perror("Błąd podczas wysyłania sygnału do kasjera");
+        //             //     continue;
+        //             // }
+        //             printf("OCZEKIWANIE NA KASJERA AZ ZAMKNIE\n");
+        //             void* status = NULL;
+        //             int ret2 = pthread_join(cashier_thread, &status);
+        //             if (ret2 == 0) {
+        //                 printf("\033[38;5;196m[KAJSER %d] kasa już zakończyła pracę , kod zakończenia: %ld\033[0m\n", cashier_to_remove, (long)status);
+        //             } else {
+        //                 perror("Błąd podczas oczekiwania na zakończenie wątku kasjera");
+        //             }
+        //             decrement_cashiers();
+        //      }
 
       }
     return NULL;
@@ -141,16 +135,12 @@ void init_manager(pthread_t* manager_thread) {
 
 // Czekanie na zakończenie wątku menedżera
 void wait_for_manager(pthread_t manager_thread) { 
-    printf("Ilosc kasjerow %d\n",get_current_cashiers());
     // Czekamy na zakończenie wątku menedżera
     int ret = pthread_join(manager_thread, NULL);
     if (ret != 0) {
         fprintf(stderr, "Błąd podczas czekania na wątek menedżera\n");
         exit(1);  // Zakończenie programu w przypadku błędu
     }
-
-    printf("KOniec waku manadzera\n");
-
     printf("Menadżer zakończył działanie.\n");
     //  fflush(stdout);
 }

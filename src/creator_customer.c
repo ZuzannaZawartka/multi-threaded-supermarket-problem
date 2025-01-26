@@ -48,7 +48,6 @@ void* cleanup_processes(void* arg) {
         pthread_mutex_lock(&pid_mutex);  // Blokujemy mutex przed modyfikacją
 
         if (get_fire_flag(shared_mem) && created_processes == 0) {
-            printf("Zakończenie czyszczenia procesów: Brak klientów i zakończenie flagi.\n");
             pthread_mutex_unlock(&pid_mutex);
             break;  // Zakończenie pętli, jeśli nie ma klientów i flaga jest ustawiona
         }
@@ -62,9 +61,11 @@ void* cleanup_processes(void* arg) {
                 for (int j = i; j < created_processes - 1; j++) {
                     pids[j] = pids[j + 1];  // Przesuwamy elementy w tablicy
                 }
+           
                 created_processes--;  // Zmniejszamy licznik procesów
                 decrement_customer_count(shared_mem);  // Aktualizujemy licznik klientów
                 safe_sem_post();
+                printf("Klient %d opuścił sklep \n",finished_pid);
                 i--;  
             }
         }
@@ -72,9 +73,9 @@ void* cleanup_processes(void* arg) {
 
         if (get_fire_flag(shared_mem)) {
             for (int i = 0; i < created_processes; i++) {
-                         decrement_customer_count(shared_mem);  // Aktualizujemy licznik klientów
+                kill(pids[i], SIGTERM);        
                 safe_sem_post();
-                kill(pids[i], SIGTERM);
+                 decrement_customer_count(shared_mem);  // Aktualizujemy licznik klientów
             }
             created_processes = 0; 
         }

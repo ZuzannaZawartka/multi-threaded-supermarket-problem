@@ -28,11 +28,12 @@ void customer_function() {
     printf("utworzenie sie klienta %d\n", getpid());
     shared_mem = get_shared_memory();
 
-    // if(get_fire_flag(shared_mem)==1){
+    // // Sprawdź, czy jest pożar
+    if (get_fire_flag(shared_mem) == 1) {
+        printf("Klient %d opuszcza sklep z powodu pożaru.\n", getpid());
+        exit(0);
+    }
 
-    //     printf("XZABITU W KLIENICE %d\n",getpid());
-    //     exit(0);
-    // }
     // block_signal_SIGTERM();
 
   
@@ -67,7 +68,11 @@ void customer_function() {
     while (1) {
         if (msgrcv(queue_id, &message, sizeof(message) - sizeof(long), pid, IPC_NOWAIT) == -1) {
             if (errno == ENOMSG) {
-                // usleep(100000);
+                  // Sprawdź, czy jest pożar
+                if (get_fire_flag(shared_mem) == 1) {
+                    printf("Klient %d opuszcza sklep z powodu pożaru.\n", pid);
+                    exit(0);
+                }
                 continue;
             } else {
                 perror("Błąd odbierania komunikatu klient od kasjera");
@@ -88,12 +93,11 @@ void setup_signal_handler_for_customers() {
     sa.sa_flags = SA_SIGINFO | SA_RESTART;  // Dodaj SA_RESTART, aby wznowić przerwane wywołania systemowe
     sigemptyset(&sa.sa_mask);  // inicjacja maski sygnałów
 
-    if (sigaction(SIGTERM, &sa, NULL) == -1) {  // Obsługuje sygnał SIGINT
-        perror("Błąd przy ustawianiu handlera dla SIGINT");
+    if (sigaction(SIGTERM, &sa, NULL) == -1) {  // Obsługuje sygnał SIGTERM
+        perror("Błąd przy ustawianiu handlera dla SIGTERM");
         exit(1);
     }
 }
-
 
 int main() {
     setup_signal_handler_for_customers();
