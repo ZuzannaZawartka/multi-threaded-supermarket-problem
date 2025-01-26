@@ -65,7 +65,7 @@ void* cleanup_processes(void* arg) {
                 created_processes--;  // Zmniejszamy licznik procesów
                 decrement_customer_count(shared_mem);  // Aktualizujemy licznik klientów
                 safe_sem_post();
-                printf("Klient %d opuścił sklep \n",finished_pid);
+                // printf("\t\t\t\tKlient %d opuścił sklep \n",finished_pid);
                 i--;  
             }
         }
@@ -73,9 +73,11 @@ void* cleanup_processes(void* arg) {
 
         if (get_fire_flag(shared_mem)) {
             for (int i = 0; i < created_processes; i++) {
+                
                 kill(pids[i], SIGTERM);        
                 safe_sem_post();
-                 decrement_customer_count(shared_mem);  // Aktualizujemy licznik klientów
+                decrement_customer_count(shared_mem);  // Aktualizujemy licznik klientów
+                printf("\t\t\t\tKlient %d opuścił sklep \n",pids[i]);
             }
             created_processes = 0; 
         }

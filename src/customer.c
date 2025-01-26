@@ -25,7 +25,7 @@ void handle_customer_signal(int sig, siginfo_t *info, void *ucontext) {
 
 // Funkcja zachowania klienta
 void customer_function() {
-    printf("utworzenie sie klienta %d\n", getpid());
+    // printf("utworzenie sie klienta %d\n", getpid());
     shared_mem = get_shared_memory();
 
     // // Sprawdź, czy jest pożar
@@ -36,8 +36,6 @@ void customer_function() {
 
     // block_signal_SIGTERM();
 
-  
-    increment_customer_count(shared_mem);
 
     pid_t pid = getpid();
     int stay_time_in_microseconds = generate_random_time(MIN_STAY_CLIENT_TIME, MAX_STAY_CLIENT_TIME);

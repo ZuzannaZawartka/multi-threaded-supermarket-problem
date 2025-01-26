@@ -28,12 +28,22 @@ void mainHandlerProcess(int signum) {
 
     set_fire_flag(shared_mem,1); 
 
-    countdown_to_exit();
+   
 
     // Wyślij sygnał do całej grupy procesów
 
     // wait_for_firefighter(firefighter_thread);//usunięcie strażaka
+
     send_signal_to_cashiers(SIGHUP); //wysyłamy sygnał
+
+     countdown_to_exit();
+
+    wait_for_manager(monitor_thread); //usuniecie manadżera
+
+    
+
+   
+    // cleanAfterCashiers();  // Sprzątanie po kasjerach kolejek komunikatów
     // send_signal_to_manager(SIGTERM);  // Wysyłanie sygnału do wątku menedżera
     // send_signal_to_customers(SIGUSR2);  // Wysyłanie sygnału do klientów
    
@@ -69,6 +79,7 @@ int main() {
             perror("Błąd podczas oczekiwania na semafor");
             break;
         }
+        increment_customer_count(shared_mem);
 
         pid_t pid = fork();  // Fork a new process for the customer
         if (pid < 0) {
@@ -76,6 +87,8 @@ int main() {
             safe_sem_post();  // Release semaphore if fork fails
         } else if (pid == 0) {
             // Child process: Execute customer program
+            
+
             if (execl("./src/customer", "customer", (char *)NULL) == -1) {
                 perror("Błąd wykonania programu customer");
                 exit(1);
@@ -90,20 +103,18 @@ int main() {
             }
      
         }
-        // usleep(500000);  // Opóźnienie przed kolejnym sprawdzeniem zakończonych procesów
+        //  usleep(50000);  // Opóźnienie przed kolejnym sprawdzeniem zakończonych procesów
     }
 
     pthread_join(cleanup_thread, NULL);
 
-    wait_for_manager(monitor_thread); //usuniecie manadżera
+    wait_for_cashiers(&customer_thread,get_current_cashiers()); //czekamy na zakończenie 
 
-    wait_for_cashiers(&customer_thread); //czekamy na zakończenie 
-
-   
-    cleanAfterCashiers();  // Sprzątanie po kasjerach kolejek komunikatów
-
-   
+    // while(get_current_cashiers()>0){
+     cleanAfterCashiers();
+    // }
     cleanup_shared_memory(shared_mem); //czyszczenie pamięci dzielonej i jej semafora
+   
     destroy_semaphore_customer();
     destroy_mutex();
     destroy_pid_mutex();

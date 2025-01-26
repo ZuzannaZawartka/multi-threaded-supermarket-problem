@@ -32,8 +32,6 @@ void init_cashier_thread_key() {
 
 void create_cashier(pthread_t* cashier_thread, int* cashier_id) {
 
-
-
     // Tworzenie kolejki komunikatu dla kasjera
     int queue_id = msgget(IPC_PRIVATE, 0600 | IPC_CREAT);
     if (queue_id == -1) {
@@ -82,10 +80,22 @@ void* cashier_function(void* arg) {
     }
 
     // Rejestracja handlera sygnału SIGUSR1 oraz SIGHUP
-    if (signal(SIGHUP, handle_cashier_signal_fire)  == SIG_ERR) { //sygnał wyjścia na pożar
+    // if (signal(SIGHUP, handle_cashier_signal_fire)  == SIG_ERR) { //sygnał wyjścia na pożar
+    //     perror("Błąd rejestracji handlera sygnału SIGHUP");
+    //     exit(1);
+    // }
+
+    struct sigaction sa;
+    sa.sa_handler = handle_cashier_signal_fire;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    if (sigaction(SIGHUP, &sa, NULL) == -1) {
         perror("Błąd rejestracji handlera sygnału SIGHUP");
         exit(1);
     }
+
+
+
     // if( signal(SIGUSR1, closeCashier) == SIG_ERR) { //sygnał wyjścia na zamykanie danego kasjera
     //     perror("Błąd rejestracji handlera sygnału SIGUSR1");
     //     exit(1);
@@ -96,6 +106,11 @@ void* cashier_function(void* arg) {
 
     Message message;
     while (1) {
+
+        if (get_fire_flag(shared_mem)) {
+            printf("Kasjer %d kończy pracę z powodu pożaru.\n", cashier_id);
+            pthread_exit(NULL);
+        }
 
         
         if (msgrcv(queue_id, &message, sizeof(message) - sizeof(long), cashier_id, IPC_NOWAIT) == -1) {  // Próba odebrania wiadomości z kolejki
@@ -143,7 +158,8 @@ void* cashier_function(void* arg) {
 
                         pthread_exit(NULL);//koniec wątku kasjera
                     }else{
-                        
+   
+                                        
                     }
                 }
 
@@ -161,14 +177,14 @@ void* cashier_function(void* arg) {
         printf("Kasjer %d obsługuje klienta o PID = %d\n", cashier_id, message.customer_pid);
 
         // Czas obsługi klienta - losowy
-        // int czas =generate_random_time(3.0, 5.0); 
-    //     // printf("czas : %d\n\n",czas);
+           // int czas =generate_random_time(3.0, 5.0); 
+        //     // printf("czas : %d\n\n",czas);
              int min_time = 1000000;  // 0.5 sekundy w mikrosekundach
-    int max_time = 2000000; // 1 sekunda w mikrosekundach
-    int random_time = min_time + rand() % (max_time - min_time + 1);
+        int max_time = 2000000; // 1 sekunda w mikrosekundach
+        int random_time = min_time + rand() % (max_time - min_time + 1);
 
-    // Uśpienie na losowy czas
-    // usleep(random_time);
+        // Uśpienie na losowy czas
+        //   usleep(random_time);
 
         // Wysłanie odpowiedzi do klienta
         message.mtype = message.customer_pid;
@@ -179,32 +195,26 @@ void* cashier_function(void* arg) {
         printf("Kasjer %d zakończył obsługę klienta o PID = %d \n", cashier_id, message.customer_pid);
     }
 
-    decrement_cashiers();
+    // decrement_cashiers();
     pthread_exit(NULL);
 
 }
 
 //koniec pracy kasjera gdy jest pożar
 void handle_cashier_signal_fire(int sig) {
-       int cashier_id = *((int*)pthread_getspecific(cashier_thread_key));
-    if (cashier_id == -1) {
-        fprintf(stderr, "Błąd: Brak przypisanego ID kasjera do wątku\n");
-        exit(1); 
-    }
+    printf("MAM SYGNAL !!!!!!\n");
     // Kasjer kończy pracę
     // while(get_customer_count(shared_mem)>0){
     //     printf("Czekam na wyjscie kleintow %d \n",get_customer_count(shared_mem));
     // }
     // printf("Wątek kasjera %d zakończył się.\n",cashier_id);
-    // decrement_cashiers();
     pthread_exit(NULL);
 }
 
 //oczekiwanie na wyjście wszystkich kasjerów
-void wait_for_cashiers(pthread_t* cashier_threads) {
+void wait_for_cashiers(pthread_t* cashier_threads,int num_cashiers) {
     void* status;
-    int num_cashiers = get_current_cashiers();
-    for (int i = 0; i < get_current_cashiers(); i++) { //zmienione na < z <=
+    for (int i = 0; i < num_cashiers; i++) { //zmienione na < z <=
         pthread_t cashier_thread = get_cashier_thread(cashier_threads, i);
 
         // Sprawdzamy, czy wątek kasjera jest zainicjowany
@@ -219,6 +229,7 @@ void wait_for_cashiers(pthread_t* cashier_threads) {
             }
         }else{
             printf("Wątek kasjera %d zakończył się.\n",i+1);
+            decrement_cashiers();
         }
     }
 }
