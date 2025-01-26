@@ -103,7 +103,7 @@ int main() {
             }
      
         }
-        //  usleep(50000);  // Opóźnienie przed kolejnym sprawdzeniem zakończonych procesów
+        usleep(100000);  // Opóźnienie przed kolejnym sprawdzeniem zakończonych procesów
     }
 
     pthread_join(cleanup_thread, NULL);

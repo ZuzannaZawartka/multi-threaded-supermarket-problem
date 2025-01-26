@@ -94,6 +94,7 @@ void* manage_customers(void* arg) {
                     //     continue;
                     // }
                     printf("OCZEKIWANIE NA KASJERA AZ ZAMKNIE\n");
+                    decrement_cashiers();
                     void* status = NULL;
                     int ret2 = pthread_join(cashier_thread, &status);
                     if (ret2 == 0) {
@@ -101,7 +102,7 @@ void* manage_customers(void* arg) {
                     } else {
                         perror("Błąd podczas oczekiwania na zakończenie wątku kasjera");
                     }
-                    decrement_cashiers();
+                    
              }
 
       }
