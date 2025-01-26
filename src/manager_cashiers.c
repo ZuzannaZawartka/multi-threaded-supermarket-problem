@@ -43,6 +43,7 @@ void* manage_customers(void* arg) {
     create_initial_cashiers(cashier_threads, cashier_ids);
 
     while (!get_fire_flag(shared_mem)) {
+
  
         int num_customers = get_customer_count(shared_mem);
        
@@ -52,7 +53,7 @@ void* manage_customers(void* arg) {
         if (required_cashiers < MIN_CASHIERS) {
             required_cashiers = MIN_CASHIERS;
         }
-        // // // //             // Dodaj nowych kasjerów
+        // // //             // Dodaj nowych kasjerów
         while ( get_current_cashiers() < required_cashiers && get_current_cashiers() < MAX_CASHIERS && !get_fire_flag(shared_mem)) {
             printf("aktywny uzytkownicy %d\n", get_active_cashiers(shared_mem));
                     printf("DODAWANIE KASJERA\n");

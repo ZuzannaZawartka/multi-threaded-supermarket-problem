@@ -10,6 +10,7 @@ typedef struct {
     int active_cashiers;  //ilosc aktywnych kasjerow z zakresu ktorego moga wybierac nowi klienci
     int customer_count;
     int fire_flag;  
+    int fire_handling_complete; 
 } SharedMemory;
 
 //zarządzanie pamięcią dzielona
@@ -40,4 +41,7 @@ int get_customer_count(SharedMemory* shared_mem);
 void set_fire_flag(SharedMemory* shared_mem, int fire_status);
 int get_fire_flag(SharedMemory* shared_mem);
 
+
+void set_fire_handling_complete(SharedMemory* shared_mem, int status);
+int get_fire_handling_complete(SharedMemory* shared_mem) ;
 #endif  

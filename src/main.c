@@ -36,7 +36,7 @@ void mainHandlerProcess(int signum) {
 
     send_signal_to_cashiers(SIGHUP); //wysyłamy sygnał
 
-     countdown_to_exit();
+    countdown_to_exit();
 
     wait_for_manager(monitor_thread); //usuniecie manadżera
 
@@ -95,7 +95,7 @@ int main() {
             }
         } else {
             if (get_fire_flag(shared_mem)) {  // Sprawdź, czy proces ma się zakończyć
-            kill(pid, SIGKILL);
+                kill(pid, SIGKILL);
             }else{
                 pthread_mutex_lock(&pid_mutex);
                 pids[created_processes++] = pid;  // Save the child PID
@@ -103,8 +103,9 @@ int main() {
             }
      
         }
-        usleep(100000);  // Opóźnienie przed kolejnym sprawdzeniem zakończonych procesów
+        // usleep(200000);  // Opóźnienie przed kolejnym sprawdzeniem zakończonych procesów
     }
+    set_fire_handling_complete(shared_mem,1);
 
     pthread_join(cleanup_thread, NULL);
 

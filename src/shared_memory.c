@@ -53,6 +53,7 @@ SharedMemory* init_shared_memory() {
 
     shared_mem->active_cashiers = 0; //ustawienie aktywnych kasjerów na 0
     shared_mem->customer_count = 0; //ustawienie aktywnych kasjerów na 0
+    shared_mem->fire_handling_complete = 0; 
 
 
     if (sem_post(shared_mem_semaphore) == -1) {
@@ -373,3 +374,44 @@ int get_fire_flag(SharedMemory* shared_mem) {
 }
 
 
+// Ustawienie flagi fire_handling_complete
+void set_fire_handling_complete(SharedMemory* shared_mem, int status) {
+    sem_t* sem = get_semaphore();
+    if (sem == NULL) {
+        perror("Błąd uzyskiwania semafora");
+        return;
+    }
+
+    if (sem_wait(sem) == -1) {
+        perror("Błąd oczekiwania na semafor");
+        return;
+    }
+
+    shared_mem->fire_handling_complete = status;
+
+    if (sem_post(sem) == -1) {
+        perror("Błąd zwolnienia semafora");
+    }
+}
+
+// Pobranie wartości fire_handling_complete
+int get_fire_handling_complete(SharedMemory* shared_mem) {
+    sem_t* sem = get_semaphore();
+    if (sem == NULL) {
+        perror("Błąd uzyskiwania semafora");
+        return -1;
+    }
+
+    if (sem_wait(sem) == -1) {
+        perror("Błąd oczekiwania na semafor");
+        return -1;
+    }
+
+    int status = shared_mem->fire_handling_complete;
+
+    if (sem_post(sem) == -1) {
+        perror("Błąd zwolnienia semafora");
+    }
+
+    return status;
+}

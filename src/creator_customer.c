@@ -37,53 +37,67 @@ void destroy_pid_mutex(){
 }
 
 void* cleanup_processes(void* arg) {
-
-    // block_signal_SIGINT();
-
     int status;
     pid_t finished_pid;
 
     while (1) {
-        // Sprawdzanie, czy zakończyć pętlę (brak klientów i flaga terminate_cleanup ustawiona)
-        pthread_mutex_lock(&pid_mutex);  // Blokujemy mutex przed modyfikacją
+        pthread_mutex_lock(&pid_mutex);
 
-        if (get_fire_flag(shared_mem) && created_processes == 0) {
+        // Jeśli nie ma klientów i flaga pożaru jest ustawiona, zakończ pętlę
+        if (get_fire_handling_complete(shared_mem) && created_processes == 0) {
             pthread_mutex_unlock(&pid_mutex);
-            break;  // Zakończenie pętli, jeśli nie ma klientów i flaga jest ustawiona
+            break;
         }
 
-        // Sprawdzamy zakończone procesy i usuwamy ich PID z tablicy
+        int current_created_processes = created_processes; // Kopia liczby procesów
+        pid_t local_pids[MAX_CUSTOMERS];                  // Kopia tablicy PID
         for (int i = 0; i < created_processes; i++) {
-            finished_pid = waitpid(pids[i], &status, WNOHANG);  // Zwróci PID zakończonego procesu
+            local_pids[i] = pids[i];
+        }
+
+        pthread_mutex_unlock(&pid_mutex);
+
+        // Przetwarzanie procesów poza mutexem
+        for (int i = 0; i < current_created_processes; i++) {
+            finished_pid = waitpid(local_pids[i], &status, WNOHANG);
             if (finished_pid > 0) {
-                // Proces zakończony, usuwamy go z tablicy
-                // printf("Proces %d zakończył działanie, usuwam z tablicy PID.\n", finished_pid);
-                for (int j = i; j < created_processes - 1; j++) {
-                    pids[j] = pids[j + 1];  // Przesuwamy elementy w tablicy
+                pthread_mutex_lock(&pid_mutex);
+                // Znajdź i usuń PID z tablicy
+                for (int j = 0; j < created_processes; j++) {
+                    if (pids[j] == finished_pid) {
+                        for (int k = j; k < created_processes - 1; k++) {
+                            pids[k] = pids[k + 1];
+                        }
+                        created_processes--;
+                        decrement_customer_count(shared_mem);
+                        safe_sem_post();
+                        break;
+                    }
                 }
-           
-                created_processes--;  // Zmniejszamy licznik procesów
-                decrement_customer_count(shared_mem);  // Aktualizujemy licznik klientów
-                safe_sem_post();
-                // printf("\t\t\t\tKlient %d opuścił sklep \n",finished_pid);
-                i--;  
+                pthread_mutex_unlock(&pid_mutex);
+
+                printf("Klient %d zakończył działanie.\n", finished_pid);
             }
         }
 
-
-        if (get_fire_flag(shared_mem)) {
+        // Jeśli flaga pożaru jest ustawiona, zabij wszystkie pozostałe procesy
+        if (get_fire_handling_complete(shared_mem)) {
+            pthread_mutex_lock(&pid_mutex);
+            current_created_processes = created_processes;
             for (int i = 0; i < created_processes; i++) {
-                
-                kill(pids[i], SIGTERM);        
-                safe_sem_post();
-                decrement_customer_count(shared_mem);  // Aktualizujemy licznik klientów
-                printf("\t\t\t\tKlient %d opuścił sklep \n",pids[i]);
+                local_pids[i] = pids[i];
             }
-            created_processes = 0; 
-        }
+            created_processes = 0;
+            pthread_mutex_unlock(&pid_mutex);
 
-        pthread_mutex_unlock(&pid_mutex);  // Zwolnienie mutexu po modyfikacji
-     
+            for (int i = 0; i < current_created_processes; i++) {
+                kill(local_pids[i], SIGTERM);
+                safe_sem_post();
+                decrement_customer_count(shared_mem);
+                waitpid(local_pids[i], &status, 0);
+                printf("Klient %d został zabity (SIGTERM).\n", local_pids[i]);
+            }
+        }
     }
 
     printf("Koniec czyszczenia procesów.\n");

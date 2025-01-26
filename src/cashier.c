@@ -184,7 +184,7 @@ void* cashier_function(void* arg) {
         int random_time = min_time + rand() % (max_time - min_time + 1);
 
         // Uśpienie na losowy czas
-          usleep(random_time);
+        //  usleep(random_time);
 
         // Wysłanie odpowiedzi do klienta
         message.mtype = message.customer_pid;

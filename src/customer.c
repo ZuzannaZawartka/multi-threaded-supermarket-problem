@@ -28,11 +28,11 @@ void customer_function() {
     // printf("utworzenie sie klienta %d\n", getpid());
     shared_mem = get_shared_memory();
 
-    // // Sprawdź, czy jest pożar
-    if (get_fire_flag(shared_mem) == 1) {
-        printf("Klient %d opuszcza sklep z powodu pożaru.\n", getpid());
-        exit(0);
-    }
+    // // // Sprawdź, czy jest pożar
+    // if (get_fire_flag(shared_mem) == 1) {
+    //     printf("Klient %d opuszcza sklep z powodu pożaru. w funkcji \n", getpid());
+    //     exit(0);
+    // }
 
     // block_signal_SIGTERM();
 
@@ -67,10 +67,6 @@ void customer_function() {
         if (msgrcv(queue_id, &message, sizeof(message) - sizeof(long), pid, IPC_NOWAIT) == -1) {
             if (errno == ENOMSG) {
                   // Sprawdź, czy jest pożar
-                if (get_fire_flag(shared_mem) == 1) {
-                    printf("Klient %d opuszcza sklep z powodu pożaru.\n", pid);
-                    exit(0);
-                }
                 continue;
             } else {
                 perror("Błąd odbierania komunikatu klient od kasjera");
