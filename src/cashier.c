@@ -179,12 +179,12 @@ void* cashier_function(void* arg) {
         // Czas obsługi klienta - losowy
            // int czas =generate_random_time(3.0, 5.0); 
         //     // printf("czas : %d\n\n",czas);
-             int min_time = 1000000;  // 0.5 sekundy w mikrosekundach
-        int max_time = 2000000; // 1 sekunda w mikrosekundach
+             int min_time = 4000000;  // 0.5 sekundy w mikrosekundach
+        int max_time = 5000000; // 1 sekunda w mikrosekundach
         int random_time = min_time + rand() % (max_time - min_time + 1);
 
         // Uśpienie na losowy czas
-        //  usleep(random_time);
+           usleep(random_time);
 
         // Wysłanie odpowiedzi do klienta
         message.mtype = message.customer_pid;
@@ -208,7 +208,7 @@ void handle_cashier_signal_fire(int sig) {
     //     printf("Czekam na wyjscie kleintow %d \n",get_customer_count(shared_mem));
     // }
     // printf("Wątek kasjera %d zakończył się.\n",cashier_id);
-    pthread_exit(NULL);
+     pthread_exit(NULL);
 }
 
 //oczekiwanie na wyjście wszystkich kasjerów
@@ -228,7 +228,7 @@ void wait_for_cashiers(pthread_t* cashier_threads,int num_cashiers) {
                 fprintf(stderr, "Błąd podczas oczekiwania na wątek kasjera %d: %d\n", i+1, ret);
             }
         }else{
-            printf("Wątek kasjera %d zakończył się.\n",i+1);
+            printf("Wątek kasjera %d zakończył się. blad\n",i+1);
             decrement_cashiers();
         }
     }

@@ -28,7 +28,7 @@ void customer_function() {
     // printf("utworzenie sie klienta %d\n", getpid());
     shared_mem = get_shared_memory();
 
-    // // // Sprawdź, czy jest pożar
+    // // // // Sprawdź, czy jest pożar
     // if (get_fire_flag(shared_mem) == 1) {
     //     printf("Klient %d opuszcza sklep z powodu pożaru. w funkcji \n", getpid());
     //     exit(0);

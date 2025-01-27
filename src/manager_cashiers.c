@@ -22,12 +22,16 @@ int terminate_flags[MAX_CASHIERS] = {0};  //Flagi dla kasjerów których usuwamy
 
 void send_signal_to_cashiers(int signal) {
     int sum_cash = get_current_cashiers();
+    printf("ilosc kasjerow %d",sum_cash);
     for (int i = 0; i < sum_cash; i++) {
+        printf("przed dostalem thread\n");
         pthread_t cashier_thread = get_cashier_thread(cashier_threads, i); 
+        printf("dostalem thread\n");
         if (pthread_kill(cashier_thread, signal) != 0) {   //wysylamy sygnal do kasjera aby zakończył pracę
             perror("Error sending signal to cashier thread");
         }
     }
+    printf("WYSLANO WSZYSTKIM\n");
 }
 
 // // Wyyłamy sygnał SIGHUP do kasjerów, aby ci zakończyli swoją pracę
@@ -141,9 +145,11 @@ void wait_for_manager(pthread_t manager_thread) {
     int ret = pthread_join(manager_thread, NULL);
     if (ret != 0) {
         fprintf(stderr, "Błąd podczas czekania na wątek menedżera\n");
-        exit(1);  // Zakończenie programu w przypadku błędu
+        // exit(1);  // Zakończenie programu w przypadku błędu
+    }else{
+        printf("Menadżer zakończył działanie.\n");
     }
-    // printf("Menadżer zakończył działanie.\n");
+
 }
 
 void destroy_mutex(){

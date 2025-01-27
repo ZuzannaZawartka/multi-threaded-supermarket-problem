@@ -34,11 +34,10 @@ void mainHandlerProcess(int signum) {
 
     // wait_for_firefighter(firefighter_thread);//usunięcie strażaka
 
-    send_signal_to_cashiers(SIGHUP); //wysyłamy sygnał
+  
 
     countdown_to_exit();
 
-    wait_for_manager(monitor_thread); //usuniecie manadżera
 
     
 
@@ -72,9 +71,10 @@ int main() {
         exit(1);
     }
 
-
+  printf("Przed while\n");
       // Main loop to fork customer processes
     while (!get_fire_flag(shared_mem)) {
+  
         if (safe_sem_wait() == -1) {  // Wait for space to create new customers
             perror("Błąd podczas oczekiwania na semafor");
             break;
@@ -103,14 +103,28 @@ int main() {
             }
      
         }
+              int min_time = 100000;  // 0.5 sekundy w mikrosekundach
+        int max_time = 200000; // 1 sekunda w mikrosekundach
+        int random_time = min_time + rand() % (max_time - min_time + 1);
+
+        // Uśpienie na losowy czas
+        //  usleep(random_time);
         // usleep(200000);  // Opóźnienie przed kolejnym sprawdzeniem zakończonych procesów
     }
+      printf("MAMY SYGNAL BY JUZ NIE ROBIC\n");
+    printf("CZEKA\n");
     set_fire_handling_complete(shared_mem,1);
-
+     printf("USTAWIONO\n");
     pthread_join(cleanup_thread, NULL);
 
-    wait_for_cashiers(&customer_thread,get_current_cashiers()); //czekamy na zakończenie 
+      send_signal_to_cashiers(SIGHUP); //wysyłamy sygnał
+      wait_for_cashiers(&customer_thread,get_current_cashiers()); //czekamy na zakończenie 
 
+    wait_for_manager(monitor_thread); //usuniecie manadżera
+
+    printf("CZEKAMY NA KASJEROW\n");
+
+    
     // while(get_current_cashiers()>0){
      cleanAfterCashiers();
     // }
