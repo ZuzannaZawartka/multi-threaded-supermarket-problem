@@ -10,6 +10,9 @@
 #include "firefighter.h"
 #include "cashier.h"
 
+// Deklaracja pthread_tryjoin_np
+int pthread_tryjoin_np(pthread_t thread, void **retval);
+
 SharedMemory* shared_mem = NULL;
 pthread_t monitor_thread;  // Declare it as a global variable
 pthread_t customer_thread;
@@ -20,6 +23,8 @@ extern pthread_mutex_t pid_mutex;  // Mutex dla ochrony tablicy PID-ów
 extern pid_t pids[MAX_CUSTOMERS];  // Tablica przechowująca PIDs procesów potomnych
 extern int created_processes ; // Licznik stworzonych procesów
 
+extern pthread_t cashier_threads[MAX_CASHIERS];
+
 void mainHandlerProcess(int signum) {
 
     if(get_fire_flag(shared_mem)==1){
@@ -28,27 +33,7 @@ void mainHandlerProcess(int signum) {
 
     set_fire_flag(shared_mem,1); 
 
-   
-
-    // Wyślij sygnał do całej grupy procesów
-
-    // wait_for_firefighter(firefighter_thread);//usunięcie strażaka
-
-  
-
     countdown_to_exit();
-
-
-    
-
-   
-    // cleanAfterCashiers();  // Sprzątanie po kasjerach kolejek komunikatów
-    // send_signal_to_manager(SIGTERM);  // Wysyłanie sygnału do wątku menedżera
-    // send_signal_to_customers(SIGUSR2);  // Wysyłanie sygnału do klientów
-   
- 
-
-    // send_signal_to_firefighter(SIGQUIT); //wysylanie sygnału do strażaka
 
 }
 
@@ -61,8 +46,7 @@ int main() {
     set_process_group();
     signal(SIGINT, mainHandlerProcess);// Rejestracja handlera SIGINT dla pożaru
 
-    // inicjalizacja semafora zliczającego klientów
-    // init_firefighter(&firefighter_thread);// tworzenie wątku dla strażaka
+
     init_manager(&monitor_thread);  // Tworzenie wątku dla managera kasjerow
 
     // Tworzymy wątek do czyszczenia zakończonych procesów
@@ -87,8 +71,6 @@ int main() {
             safe_sem_post();  // Release semaphore if fork fails
         } else if (pid == 0) {
             // Child process: Execute customer program
-            
-
             if (execl("./src/customer", "customer", (char *)NULL) == -1) {
                 perror("Błąd wykonania programu customer");
                 exit(1);
@@ -103,31 +85,29 @@ int main() {
             }
      
         }
-              int min_time = 100000;  // 0.5 sekundy w mikrosekundach
-        int max_time = 200000; // 1 sekunda w mikrosekundach
+              int min_time = 1000000;  // 0.5 sekundy w mikrosekundach
+        int max_time = 2000000; // 1 sekunda w mikrosekundach
         int random_time = min_time + rand() % (max_time - min_time + 1);
 
         // Uśpienie na losowy czas
-        //  usleep(random_time);
+            // usleep(random_time);
         // usleep(200000);  // Opóźnienie przed kolejnym sprawdzeniem zakończonych procesów
     }
-      printf("MAMY SYGNAL BY JUZ NIE ROBIC\n");
-    printf("CZEKA\n");
+  
     set_fire_handling_complete(shared_mem,1);
-     printf("USTAWIONO\n");
-    pthread_join(cleanup_thread, NULL);
+    
 
-      send_signal_to_cashiers(SIGHUP); //wysyłamy sygnał
-      wait_for_cashiers(&customer_thread,get_current_cashiers()); //czekamy na zakończenie 
+    pthread_join(cleanup_thread, NULL);
+    send_signal_to_cashiers(SIGHUP); //wysyłamy sygnał
+
+    wait_for_cashiers(cashier_threads,get_current_cashiers()); //czekamy na zakończenie 
+   
 
     wait_for_manager(monitor_thread); //usuniecie manadżera
 
-    printf("CZEKAMY NA KASJEROW\n");
 
-    
-    // while(get_current_cashiers()>0){
-     cleanAfterCashiers();
-    // }
+    cleanAfterCashiers();
+
     cleanup_shared_memory(shared_mem); //czyszczenie pamięci dzielonej i jej semafora
    
     destroy_semaphore_customer();
@@ -154,8 +134,6 @@ void send_signal_to_firefighter(int signal) {
         perror("Błąd wysyłania sygnału do strażaka"); //(TOFIX ?)tutaj blad wyrzuci gdy strazak sam sie wywola
     }
 }
-
-
 
 void set_process_group() {
     pid_t pid = getpid();

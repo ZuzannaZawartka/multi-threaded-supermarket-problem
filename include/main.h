@@ -1,7 +1,7 @@
 #ifndef MAIN_H
 #define MAIN_H
 
-#define MIN_PEOPLE_FOR_CASHIER 3  // Na każdą grupę 5 klientów przypada jeden kasjer
+#define MIN_PEOPLE_FOR_CASHIER 2  // Na każdą grupę 5 klientów przypada jeden kasjer
 #define MAX_CASHIERS 10 //maksymalna liczba kasjerów
 #define MIN_CASHIERS 2 //minimalna liczba kasjerów
 #define MAX_CUSTOMERS 100// Maksymalna liczba klientów
