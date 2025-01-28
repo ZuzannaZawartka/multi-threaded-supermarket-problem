@@ -63,7 +63,7 @@ int main() {
 
         pid_t pid = fork();                 // Tworzenie nowego procesu klienta
         if (pid < 0) {
-            perror("Fork failed");
+            perror("Fork failed, błędne wywołanie fork");
             safe_sem_post();                // Zwolnienie semafora w przypadku błędu
         } else if (pid == 0) {
             // Kod wykonywany przez proces potomny (klient)
@@ -89,7 +89,6 @@ int main() {
     send_signal_to_firefighter(SIGQUIT);        // Wysyłanie sygnału SIGQUIT do strażaka
     pthread_join(cleanup_thread, NULL);         // Czekanie na zakończenie wątku czyszczącego
     
-
     send_signal_to_cashiers(SIGHUP);            // Wysyłanie sygnału do kasjerów, aby zakończyli pracę
     wait_for_cashiers(cashier_threads,get_current_cashiers()); // Czekanie na zakończenie wątków kasjerów
     wait_for_manager(monitor_thread);           // Czekanie na zakończenie wątku menedżera

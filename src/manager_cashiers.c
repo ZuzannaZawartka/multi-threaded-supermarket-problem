@@ -28,7 +28,7 @@ void send_signal_to_cashiers(int signal) {
     for (int i = 0; i < sum_cash; i++) {
         pthread_t cashier_thread = get_cashier_thread(cashier_threads, i); 
         if (pthread_kill(cashier_thread, signal) != 0) {  
-            perror("Error sending signal to cashier thread");
+            // perror("Error sending signal to cashier thread");
         }
     }
 }
