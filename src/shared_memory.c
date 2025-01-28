@@ -3,15 +3,22 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
-#include <semaphore.h>  // Załączamy semafor
-#include <sys/msg.h>  // Nagłówek do obsługi kolejek komunikatów
+#include <semaphore.h>
+#include <sys/msg.h>
 #include <fcntl.h>
 #include "shared_memory.h"
 
 #define SHM_KEY 13387 
 #define SEM_NAME "/shared_mem_semaphore" 
 
-// Inicjalizowanie pamięci dzielonej z semaforem POSIX
+/**
+ * @brief Inicjalizuje pamięć dzieloną i semafor do niej przypisany.
+ * 
+ * @details Funkcja tworzy segment pamięci dzielonej i semafor POSIX do jej synchronizacji. 
+ * Inicjalizuje pola pamięci dzielonej, w tym tablicę kolejek oraz zmienne sterujące.
+ * 
+ * @return Wskaźnik do zainicjalizowanej pamięci dzielonej.
+ */
 SharedMemory* init_shared_memory() {
 
     // Tworzenie pamięci dzielonej
@@ -48,24 +55,30 @@ SharedMemory* init_shared_memory() {
     }
 
     for (int i = 0; i < MAX_CASHIERS; i++) {
-        shared_mem->queue_ids[i] = -1;  // Wartość -1 oznacza brak kolejki (inicjalizacja tablicy kolejek quques)
+        shared_mem->queue_ids[i] = -1;          // Wartość -1 oznacza brak kolejki (inicjalizacja tablicy kolejek quques)
     }
 
-    shared_mem->active_cashiers = 0; //ustawienie aktywnych kasjerów na 0
-    shared_mem->customer_count = 0; //ustawienie aktywnych kasjerów na 0
-    shared_mem->fire_handling_complete = 0; 
-
+    shared_mem->active_cashiers = 0;            //ustawienie aktywnych kasjerów na 0
+    shared_mem->customer_count = 0;             //ustawienie aktywnych kasjerów na 0
+    shared_mem->fire_handling_complete = 0;     //ustawieni flagi informującej o końcu tworzenia klientów
 
     if (sem_post(shared_mem_semaphore) == -1) {
         perror("Błąd zwolnienia semafora");
         exit(1);
     }
-    printf("shared memory zainicjalizowane\n");
+
+    printf("Pamięć Dzielona Zainicjalizowana\n");
 
     return shared_mem;
 }
 
-//ustawienie kolejki komunikatów dla określonego kasjera
+/**
+ * @brief Ustawia identyfikator kolejki komunikatów dla danego kasjera.
+ * 
+ * @param shared_mem Wskaźnik do pamięci dzielonej.
+ * @param cashier_id Identyfikator kasjera (1-10).
+ * @param queue_id Identyfikator kolejki komunikatów.
+ */
 void set_queue_id(SharedMemory* shared_mem, int cashier_id, int queue_id) {
     // Uzyskanie semafora
     sem_t* sem = get_semaphore();
@@ -92,6 +105,14 @@ void set_queue_id(SharedMemory* shared_mem, int cashier_id, int queue_id) {
     }
 }
 
+/**
+ * @brief Pobiera identyfikator kolejki komunikatów dla danego kasjera.
+ * 
+ * @param shared_mem Wskaźnik do pamięci dzielonej.
+ * @param cashier_id Identyfikator kasjera (1-10).
+ * 
+ * @return Identyfikator kolejki komunikatów lub -1 w przypadku błędu.
+ */
 int get_queue_id(SharedMemory* shared_mem, int cashier_id) {
     // Uzyskanie semafora
     sem_t* sem = get_semaphore();
@@ -113,7 +134,11 @@ int get_queue_id(SharedMemory* shared_mem, int cashier_id) {
     return queue_id;
 }
 
-// Funkcja zwracająca wskaźnik do pamięci dzielonej
+/**
+ * @brief Zwraca wskaźnik do już istniejącej pamięci dzielonej.
+ * 
+ * @return Wskaźnik do pamięci dzielonej.
+ */
 SharedMemory* get_shared_memory() {
     // Przyłączenie do istniejącej pamięci dzielonej
     int shm_id = shmget(SHM_KEY, sizeof(SharedMemory), 0600);
@@ -131,6 +156,11 @@ SharedMemory* get_shared_memory() {
     return shared_mem;
 }
 
+/**
+ * @brief Czyści pamięć dzieloną i powiązany semafor.
+ * 
+ * @param shared_mem Wskaźnik do pamięci dzielonej.
+ */
 void cleanup_shared_memory(SharedMemory* shared_mem) {
     sem_t* sem = get_semaphore();
     if (sem == NULL) {
@@ -162,10 +192,14 @@ void cleanup_shared_memory(SharedMemory* shared_mem) {
         perror("Błąd zwolnienia semafora");
     }
 
-    // Czyszczenie semafora
     cleanup_semaphore();
 }
 
+/**
+ * @brief Pobiera wskaźnik do istniejącego semafora powiązanego z pamięcią dzieloną.
+ * 
+ * @return Wskaźnik do semafora lub NULL w przypadku błędu.
+ */
 sem_t* get_semaphore() {
     // Uzyskanie semafora
     sem_t* sem = sem_open(SEM_NAME, 0);  // Otwieranie istniejącego semafora
@@ -176,22 +210,32 @@ sem_t* get_semaphore() {
     return sem;
 }
 
-//usuwanie semafora dla shared memory
+/**
+ * @brief Usuwa semafor powiązany z pamięcią dzieloną.
+ */
 void cleanup_semaphore() {
     sem_t* sem = get_semaphore();
 
     if (sem_close(sem) == -1) {
         perror("Błąd zamykania semafora");
+        return;
     }
 
     if (sem_unlink(SEM_NAME) == -1) {
         perror("Błąd usuwania semafora");
+        return;
     } else {
         printf("Semafor został poprawnie usunięty shared memory\n");
     }
 }
 
-//zwracanie ilosc aktywnych kasjerów do których można się ustawić w kolejce
+/**
+ * @brief Zwraca liczbę aktywnych kasjerów.
+ * 
+ * @param shared_mem Wskaźnik do pamięci dzielonej.
+ * 
+ * @return Liczba aktywnych kasjerów.
+ */
 int get_active_cashiers(SharedMemory* shared_mem) {
     sem_t* sem = get_semaphore();
     if (sem == NULL) {
@@ -210,11 +254,19 @@ int get_active_cashiers(SharedMemory* shared_mem) {
     // Zwolnienie semafora
     if (sem_post(sem) == -1) {
         perror("Błąd zwolnienia semafora");
+        return -1;
     }
     return active_cashiers;
 }
 
-//zwiększanie liczby aktywnych kasjerów
+/**
+ * @brief Zwiększa liczbę aktywnych kasjerów w pamięci dzielonej.
+ * 
+ * @param shared_mem Wskaźnik do pamięci dzielonej.
+ * 
+ * @details Funkcja zwiększa licznik aktywnych kasjerów o jeden, jeśli liczba aktywnych kasjerów
+ * nie przekracza wartości `MAX_CASHIERS`. Operacja jest chroniona semaforem.
+ */
 void increment_active_cashiers(SharedMemory* shared_mem) {
     sem_t* sem = get_semaphore();
     if (sem == NULL) {
@@ -236,10 +288,18 @@ void increment_active_cashiers(SharedMemory* shared_mem) {
  
     if (sem_post(sem) == -1) {
         perror("Błąd zwolnienia semafora");
+        return;
     }
 }
 
-//zmienjszanie liczby aktywnych kasjerów
+/**
+ * @brief Zmniejsza liczbę aktywnych kasjerów w pamięci dzielonej.
+ * 
+ * @param shared_mem Wskaźnik do pamięci dzielonej.
+ * 
+ * @details Funkcja zmniejsza licznik aktywnych kasjerów o jeden, jeśli liczba aktywnych kasjerów
+ * jest większa niż 0. Operacja jest chroniona semaforem.
+ */
 void decrement_active_cashiers(SharedMemory* shared_mem) {
     sem_t* sem = get_semaphore();
     if (sem == NULL) {
@@ -262,10 +322,17 @@ void decrement_active_cashiers(SharedMemory* shared_mem) {
 
     if (sem_post(sem) == -1) {
         perror("Błąd zwolnienia semafora");
+        return;
     }
 }
 
-
+/**
+ * @brief Zwiększa licznik klientów w pamięci dzielonej.
+ * 
+ * @param shared_mem Wskaźnik do pamięci dzielonej.
+ * 
+ * @details Funkcja zwiększa licznik klientów o jeden. Operacja jest chroniona semaforem.
+ */
 void increment_customer_count(SharedMemory* shared_mem) {
     sem_t* sem = get_semaphore();
     if (sem == NULL) {
@@ -277,37 +344,49 @@ void increment_customer_count(SharedMemory* shared_mem) {
         perror("Błąd oczekiwania na semafor");
         return;
     }
-
     shared_mem->customer_count+=1;
 
     if (sem_post(sem) == -1) {
         perror("Błąd zwolnienia semafora");
+        return;
     }
 }
 
+/**
+ * @brief Zmniejsza licznik klientów w pamięci dzielonej.
+ * 
+ * @param shared_mem Wskaźnik do pamięci dzielonej.
+ * 
+ * @details Funkcja zmniejsza licznik klientów o jeden, jeśli liczba klientów jest większa niż 0.
+ * Operacja jest chroniona semaforem.
+ */
 void decrement_customer_count(SharedMemory* shared_mem) {
     sem_t* sem = get_semaphore();
     if (sem == NULL) {
         perror("Błąd uzyskiwania semafora");
         return;
     }
-
     if (sem_wait(sem) == -1) {
         perror("Błąd oczekiwania na semafor");
         return;
     }
-    if (shared_mem->customer_count > 0) {
-        shared_mem->customer_count--;
-     }// else {
-    //     fprintf(stderr, "Błąd: liczba klientów nie może być mniejsza niż 0\n");
-    // }
-
+    shared_mem->customer_count--;
     if (sem_post(sem) == -1) {
         perror("Błąd zwolnienia semafora");
+        return;
     }
 
 }
 
+/**
+ * @brief Zwraca liczbę aktualnych klientów.
+ * 
+ * @param shared_mem Wskaźnik do pamięci dzielonej.
+ * 
+ * @return Liczba klientów w pamięci dzielonej.
+ * 
+ * @details Funkcja zwraca wartość licznika klientów. Operacja jest chroniona semaforem.
+ */
 int get_customer_count(SharedMemory* shared_mem) {
     sem_t* sem = get_semaphore();
     if (sem == NULL) {
@@ -324,12 +403,19 @@ int get_customer_count(SharedMemory* shared_mem) {
 
     if (sem_post(sem) == -1) {
         perror("Błąd zwolnienia semafora");
+        return -1;
     }
     return customer_count;
 }
 
-
-// Funkcja ustawiająca flagę pożaru w pamięci dzielonej
+/**
+ * @brief Ustawia flagę pożaru w pamięci dzielonej.
+ * 
+ * @param shared_mem Wskaźnik do pamięci dzielonej.
+ * @param fire_status Wartość flagi (`1` oznacza pożar, `0` brak pożaru).
+ * 
+ * @details Funkcja ustawia flagę pożaru w pamięci dzielonej. Operacja jest chroniona semaforem.
+ */
 void set_fire_flag(SharedMemory* shared_mem, int fire_status) {
     sem_t* sem = get_semaphore();
     if (sem == NULL) {
@@ -342,7 +428,6 @@ void set_fire_flag(SharedMemory* shared_mem, int fire_status) {
         return;
     }
 
-    // Ustawienie flagi pożaru
     shared_mem->fire_flag = fire_status;
 
     if (sem_post(sem) == -1) {
@@ -350,7 +435,16 @@ void set_fire_flag(SharedMemory* shared_mem, int fire_status) {
     }
 }
 
-// Funkcja zwracająca flagę pożaru z pamięci dzielonej
+/**
+ * @brief Pobiera wartość flagi pożaru z pamięci dzielonej.
+ * 
+ * @param shared_mem Wskaźnik do pamięci dzielonej.
+ * 
+ * @return Wartość flagi pożaru (`1` oznacza pożar, `0` brak pożaru).
+ * 
+ * @details Funkcja zwraca aktualną wartość flagi pożaru z pamięci dzielonej.
+ * Operacja jest chroniona semaforem.
+ */
 int get_fire_flag(SharedMemory* shared_mem) {
     sem_t* sem = get_semaphore();
     if (sem == NULL) {
@@ -363,7 +457,6 @@ int get_fire_flag(SharedMemory* shared_mem) {
         return -1;
     }
 
-    // Odczytanie flagi pożaru
     int fire_status = shared_mem->fire_flag;
 
     if (sem_post(sem) == -1) {
@@ -373,8 +466,15 @@ int get_fire_flag(SharedMemory* shared_mem) {
     return fire_status;
 }
 
-
-// Ustawienie flagi fire_handling_complete
+/**
+ * @brief Ustawia flagę informującą o zakończeniu obsługi pożaru.
+ * 
+ * @param shared_mem Wskaźnik do pamięci dzielonej.
+ * @param status Wartość flagi (`1` oznacza zakończenie obsługi, `0` brak zakończenia obsługi).
+ * 
+ * @details Funkcja ustawia flagę `fire_handling_complete` w pamięci dzielonej.
+ * Operacja jest chroniona semaforem.
+ */
 void set_fire_handling_complete(SharedMemory* shared_mem, int status) {
     sem_t* sem = get_semaphore();
     if (sem == NULL) {
@@ -394,7 +494,16 @@ void set_fire_handling_complete(SharedMemory* shared_mem, int status) {
     }
 }
 
-// Pobranie wartości fire_handling_complete
+/**
+ * @brief Pobiera wartość flagi informującej o zakończeniu obsługi pożaru.
+ * 
+ * @param shared_mem Wskaźnik do pamięci dzielonej.
+ * 
+ * @return Wartość flagi `fire_handling_complete` (`1` oznacza zakończenie obsługi, `0` brak zakończenia obsługi).
+ * 
+ * @details Funkcja zwraca aktualną wartość flagi `fire_handling_complete`.
+ * Operacja jest chroniona semaforem.
+ */
 int get_fire_handling_complete(SharedMemory* shared_mem) {
     sem_t* sem = get_semaphore();
     if (sem == NULL) {

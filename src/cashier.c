@@ -12,101 +12,72 @@
 #include "creator_customer.h"
 #include "customer.h"
 #include <stdatomic.h>
-// #include "main.h" //Dla zmiennych długości obsługi przez kasjera
 
-extern SharedMemory* shared_mem; // Deklaracja pamięci dzielonej
-extern pthread_mutex_t mutex;
-extern int current_cashiers;
+extern SharedMemory* shared_mem;                // Wskaźnik do pamięci dzielonej
+extern pthread_mutex_t mutex;                   // Mutex do synchronizacji wątków
+extern int current_cashiers;                    // Liczba aktualnie działających kasjerów
+extern int terminate_flags[MAX_CASHIERS];       // Flagi końca pracy dla kasjerów
+extern pthread_t cashier_threads[MAX_CASHIERS]; // Tablica wątków kasjerów
 
-pthread_key_t cashier_thread_key;// Klucz dla danych kasjera w pamięci specyficznej dla wątku
-extern int terminate_flags[MAX_CASHIERS];
-
-extern pthread_t cashier_threads[MAX_CASHIERS];
-
-
-//inicjalizacja klucza który trzyma cashier_id dla wątku
-void init_cashier_thread_key() {
-    if (pthread_key_create(&cashier_thread_key, NULL) != 0) {
-        perror("Błąd tworzenia klucza dla wątku kasjera");
-        exit(1);
-    }
-}
-
+/**
+ * @brief Tworzy wątek kasjera oraz przypisaną mu kolejkę komunikatów.
+ * 
+ * @param cashier_thread Wskaźnik do wątku kasjera.
+ * @param cashier_id Wskaźnik do ID kasjera.
+ * 
+ * @details Tworzy kolejkę komunikatów dla danego kasjera i zapisuje jej ID w pamięci dzielonej.
+ * Następnie inicjalizuje wątek kasjera.
+ */
 void create_cashier(pthread_t* cashier_thread, int* cashier_id) {
 
     // Tworzenie kolejki komunikatu dla kasjera
     int queue_id = msgget(IPC_PRIVATE, 0600 | IPC_CREAT);
     if (queue_id == -1) {
         perror("Błąd tworzenia kolejki komunikatów");
-        exit(1);
+        pthread_exit(NULL);
     }
 
     // Zapisanie identyfikatora kolejki w pamięci dzielonej
     set_queue_id(shared_mem, *cashier_id , queue_id);
 
-
-    // // Przypisanie ID kasjera do wątku
-    // if (pthread_setspecific(cashier_thread_key, cashier_id) != 0) {
-    //     perror("Błąd przypisania ID kasjera do wątku");
-    //     exit(1);
-    // }
-
     // Tworzenie wątku kasjera
     if (pthread_create(cashier_thread, NULL, cashier_function, cashier_id) != 0) {
         perror("Błąd tworzenia wątku kasjera");
-        exit(1);
+        pthread_exit(NULL);
     }
-
     printf("Kasjer %d został uruchomiony.\n", *cashier_id);
 }
 
-
+/**
+ * @brief Funkcja obsługująca działanie wątku kasjera.
+ * 
+ * @param arg Wskaźnik do ID kasjera.
+ * @return Zwraca NULL po zakończeniu działania wątku.
+ * 
+ * @details Kasjer obsługuje klientów na podstawie wiadomości w jego kolejce komunikatów.
+ * Po zakończeniu obsługi, wątek kasjera kończy się.
+ */
 void* cashier_function(void* arg) {
-
-    static int initialized = 0;
-    if (!initialized) {
-        init_cashier_thread_key(); // Inicjalizuj klucz wątku kasjera
-        initialized = 1;
-    }
 
     srand(time(NULL));
 
     int cashier_id = *((int*)arg);  //pobranie cashier_id z argumentów
 
-    // Przypisanie ID kasjera do wątku
-    if (pthread_setspecific(cashier_thread_key, &cashier_id) != 0) {
-        perror("Błąd przypisania ID kasjera do wątku");
-        exit(1);
-    }
-
-    // Rejestracja handlera sygnału SIGUSR1 oraz SIGHUP
-    if (signal(SIGHUP, handle_cashier_signal_fire)  == SIG_ERR) { //sygnał wyjścia na pożar
-        perror("Błąd rejestracji handlera sygnału SIGHUP");
-        exit(1);
-    }
-
+    // Rejestracja handlera sygnału SIGHUP
     struct sigaction sa;
     sa.sa_handler = handle_cashier_signal_fire;
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = 0;
     if (sigaction(SIGHUP, &sa, NULL) == -1) {
         perror("Błąd rejestracji handlera sygnału SIGHUP");
-        exit(1);
+        pthread_exit(NULL);
     }
-
 
     // Pobieranie identyfikatora kolejki kasjera z pamięci dzielonej
     int queue_id = get_queue_id(shared_mem, cashier_id);
 
     Message message;
     while (get_fire_flag(shared_mem)!=1) {
-
-        // if (get_fire_flag(shared_mem)) {
-        //     printf("[KONIEC ////////////////////////////// w fire]Kasjer %d kończy pracę z powodu pożaru.\n", cashier_id);
-        //     pthread_exit(NULL);
-        // }
-
-        
         if (msgrcv(queue_id, &message, sizeof(message) - sizeof(long), cashier_id, IPC_NOWAIT) == -1) {  // Próba odebrania wiadomości z kolejki
            if (errno == ENOMSG) {
                 
@@ -115,33 +86,32 @@ void* cashier_function(void* arg) {
                     perror("Błąd podczas blokowania mutexa");
                     pthread_exit(NULL);
                 }
-                int terminate_flag = terminate_flags[cashier_id - 1];// Sprawdzenie flagi końca pracy
+                
+                int terminate_flag = terminate_flags[cashier_id - 1];       // Sprawdzenie flagi końca pracy
+                
                 ret = pthread_mutex_unlock(&mutex);
                 if (ret != 0) {
                     perror("Błąd podczas zwalniania mutexa");
                     pthread_exit(NULL);
                 }
 
-                if (terminate_flag == 1) { //jesli flaga zakończenia pracy jest aktywna a juz nie ma wiadomosci to mozemy usuwac kasjera
+                if (terminate_flag == 1) {                                  // Jeśli flaga zakończenia pracy jest aktywna a już nie ma wiadomości to możemy usuwać kasjera.
                     struct msqid_ds queue_info;
-
-
-                    // Sprawdzamy, czy kolejka jest pusta
-                    if (msgctl(queue_id, IPC_STAT, &queue_info) == -1) {
+                    if (msgctl(queue_id, IPC_STAT, &queue_info) == -1) {    // Sprawdzamy, czy kolejka jest pusta
                         perror("Błąd pobierania informacji o kolejce");
                         pthread_exit(NULL);
                     }
 
-                    if (queue_info.msg_qnum == 0) { //jeśli nie ma wiadomości to czyścimy kasjera
+                    if (queue_info.msg_qnum == 0) {                         // Kolejka jest pusta
                     
-                        cleanup_queue(cashier_id);// Czyszczenie kolejki komunikatów
+                        cleanup_queue(cashier_id);                          // Czyszczenie kolejki komunikatów
 
                         int ret = pthread_mutex_lock(&mutex);
                         if (ret != 0) {
                             perror("Błąd podczas blokowania mutexa");
                             pthread_exit(NULL);
                         }
-                        terminate_flags[cashier_id-1]=0; // wyzerowanie flagi
+                        terminate_flags[cashier_id-1]=0;                    // Wyzerowanie flagi (dla kolejnych kasjerów którzy będą używać tego id)
                         ret = pthread_mutex_unlock(&mutex);
                         if (ret != 0) {
                             perror("Błąd podczas zwalniania mutexa");
@@ -151,18 +121,13 @@ void* cashier_function(void* arg) {
                         printf("\033[31m[KASJER %d] obsłużył wszystkich\033[0m\n\n", cashier_id);
 
                         pthread_exit(NULL);//koniec wątku kasjera
-                    }else{
-   
-                                        
                     }
                 }
-
-                //    usleep(10000); // Jeśli nie ma wiadomości, kasjer czeka
+                usleep(10000); // Jeśli nie ma wiadomości, kasjer czeka
                 continue;
-           }
+            }
             else if (errno == EINTR) {
-            printf("msgrcv przerwane przez sygnał, ponawiam próbę...\n");
-            continue;
+                continue;
             }
             perror("Błąd odbierania komunikatu kasjer");
             pthread_exit(NULL);
@@ -170,21 +135,15 @@ void* cashier_function(void* arg) {
 
         printf("Kasjer %d obsługuje klienta o PID = %d\n", cashier_id, message.customer_pid);
 
-        // Czas obsługi klienta - losowy
-           // int czas =generate_random_time(3.0, 5.0); 
-        //     // printf("czas : %d\n\n",czas);
-        int min_time = 4000000;  // 0.5 sekundy w mikrosekundach
-        int max_time = 5000000; // 1 sekunda w mikrosekundach
-        int random_time = min_time + rand() % (max_time - min_time + 1);
-
         // Uśpienie na losowy czas
-           usleep(random_time);
+        int stay_time_in_microseconds = generate_random_time(MIN_CASHIER_OPERATION, MAX_CASHIER_OPERATION);
+        usleep(stay_time_in_microseconds);
 
         // Wysłanie odpowiedzi do klienta
         message.mtype = message.customer_pid;
         if (msgsnd(queue_id, &message, sizeof(message) - sizeof(long), 0) == -1) {
             perror("Błąd wysyłania komunikatu do klienta");
-            exit(1);
+            pthread_exit(NULL);
         }
         printf("Kasjer %d zakończył obsługę klienta o PID = %d \n", cashier_id, message.customer_pid);
     }
@@ -192,12 +151,23 @@ void* cashier_function(void* arg) {
     pthread_exit(NULL);
 }
 
-//koniec pracy kasjera gdy jest pożar
+/**
+ * @brief Obsługuje sygnał SIGHUP dla kasjera w sytuacji pożaru.
+ * 
+ * @param sig Numer odebranego sygnału.
+ * 
+ * @details Po odebraniu sygnału kasjer natychmiast kończy pracę.
+ */
 void handle_cashier_signal_fire(int sig) {
-     pthread_exit(NULL);
+    pthread_exit(NULL);
 }
 
-//oczekiwanie na wyjście wszystkich kasjerów
+/**
+ * @brief Oczekuje na zakończenie działania wszystkich wątków kasjerów.
+ * 
+ * @param cashier_threads Tablica wątków kasjerów.
+ * @param num_cashiers Liczba aktualnych kasjerów.
+ */
 void wait_for_cashiers(pthread_t* cashier_threads,int num_cashiers) {
     void* status;
     for (int i = 0; i < num_cashiers; i++) { //zmienione na < z <=
@@ -220,7 +190,11 @@ void wait_for_cashiers(pthread_t* cashier_threads,int num_cashiers) {
     }
 }
 
-//czyszczenie kolejki komunikatów dla danego kasjera
+/**
+ * @brief Usuwa kolejkę komunikatów przypisaną do kasjera.
+ * 
+ * @param cashier_id ID kasjera.
+ */
 void cleanup_queue(int cashier_id) {
     int queue_id = get_queue_id(shared_mem, cashier_id);
 
@@ -234,9 +208,11 @@ void cleanup_queue(int cashier_id) {
     }
 }
 
-//usuwanie wszystkich kolejek komunikatów (Wywoływane z poziomu manadzera);
+/**
+ * @brief Usuwa wszystkie kolejki komunikatów przypisane do kasjerów.
+ */
 void cleanAfterCashiers() {
-    for (int i = 1; i <= MAX_CASHIERS; i++) { //od jedynki ponieważ kasjerzy mają id od 1 do 10
+    for (int i = 1; i <= MAX_CASHIERS; i++) { // Od jedynki ponieważ kasjerzy mają id od 1 do 10
         cleanup_queue(i);
     }
 }
