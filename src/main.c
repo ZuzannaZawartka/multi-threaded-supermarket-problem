@@ -145,10 +145,17 @@ void send_signal_to_customers(int signal) {
  * Jeśli wystąpi błąd (np. strażak już zakończył działanie), funkcja wypisuje komunikat o błędzie.
  */
 void send_signal_to_firefighter(int signal) {
-    if (pthread_kill(firefighter_thread, signal) != 0) {
-        perror("Błąd wysyłania sygnału do strażaka"); //(TOFIX ?)tutaj blad wyrzuci gdy strazak sam sie wywola
+    int err = pthread_kill(firefighter_thread, 0); // Check if the thread is still alive
+    if (err == 0) {
+        // Thread is alive, send the specified signal
+        if (pthread_kill(firefighter_thread, signal) != 0) {
+            perror("Błąd wysyłania sygnału do strażaka");
+        } else {
+            printf("Sygnał %d wysłany do strażaka.\n", signal);
+        }
     }
 }
+
 
 /**
  * @brief Ustawia bieżący proces jako lidera grupy procesów.
@@ -187,7 +194,7 @@ void onFireSignalHandler(int signum) {
 
 
 /**
- * @brief Obsługuje sygnał SIGINT (Ctrl+C) w celu rozpoczęcia procedury zamknięcia supermarketu.
+ * @brief Obsługuje sygnał SIGUSR w celu rozpoczęcia procedury zamknięcia supermarketu na strażaka.
  * 
  * @param signum Numer sygnału, który wywołał handler.
  * 
@@ -202,6 +209,6 @@ void onFireSignalHandlerForFirefighter(int signum) {
     }
     set_fire_flag(shared_mem,1); 
     countdown_to_exit();
-    send_signal_to_cashiers(SIGHUP);            // Wysyłanie sygnału do kasjerów, aby zakończyli pracę
+    send_signal_to_cashiers(SIGHUP);  
 }
 
