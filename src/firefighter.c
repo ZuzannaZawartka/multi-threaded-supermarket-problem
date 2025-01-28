@@ -53,11 +53,12 @@ void firefighter_process() {
     // Oczekiwanie przez losowy czas
     usleep(random_time);
 
+    
     // Wysyłanie sygnału SIGINT do wszystkich procesów potomnych głównego procesu
     printf("Strażak wysyła SIGINT do wszystkich procesów potomnych...\n");
 
     // Wysłanie sygnału SIGINT do wszystkich procesów potomnych
-    kill(0, SIGINT);  // 0 oznacza, że wysyłamy do wszystkich procesów potomnych w grupie
+    kill(0, SIGUSR1);  // 0 oznacza, że wysyłamy do wszystkich procesów potomnych w grupie
 }
 
 /**

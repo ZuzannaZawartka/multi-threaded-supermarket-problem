@@ -43,6 +43,9 @@ int main() {
     // Rejestracja handlera sygnału SIGINT (Ctrl+C)
     signal(SIGINT, onFireSignalHandler);
 
+    // Rejestracja handlera sygnału SIGUSR1 Strażak
+    signal(SIGUSR1, onFireSignalHandlerForFirefighter);
+
     // Inicjalizacja wątku menedżera kasjerów
     init_manager(&monitor_thread);
 
@@ -180,3 +183,25 @@ void onFireSignalHandler(int signum) {
     set_fire_flag(shared_mem,1); 
     countdown_to_exit();
 }
+
+
+
+/**
+ * @brief Obsługuje sygnał SIGINT (Ctrl+C) w celu rozpoczęcia procedury zamknięcia supermarketu.
+ * 
+ * @param signum Numer sygnału, który wywołał handler.
+ * 
+ * @details Funkcja ustawia flagę pożaru w pamięci dzielonej oraz uruchamia procedurę
+ * odliczania do zamknięcia supermarketu. Jeśli flaga pożaru jest już ustawiona, handler
+ * nie wykonuje żadnych działań.
+ */
+void onFireSignalHandlerForFirefighter(int signum) {
+
+    if(get_fire_flag(shared_mem)==1){
+        return;
+    }
+    set_fire_flag(shared_mem,1); 
+    countdown_to_exit();
+    send_signal_to_cashiers(SIGHUP);            // Wysyłanie sygnału do kasjerów, aby zakończyli pracę
+}
+

@@ -64,7 +64,7 @@ void* manage_customers(void* arg) {
             increment_active_cashiers(shared_mem);
 
             printf("\033[1;32m[KASJER %d] OTWIERANIE, watek %ld , Obecny zakres kasjerów : 1 - %d\033[0m\n\n",get_current_cashiers(),cashier_thread, get_active_cashiers(shared_mem));
-            usleep(1000);
+            usleep(10000);
         }
 
         // Usuwanie zbędnych kasjerów
@@ -97,7 +97,7 @@ void* manage_customers(void* arg) {
             } else {
                  perror("Błąd podczas oczekiwania na zakończenie wątku kasjera");
             }  
-            usleep(1000);                    
+            usleep(10000);                    
         }
         usleep(10000);
     }
